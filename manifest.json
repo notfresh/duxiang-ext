@@ -1,0 +1,37 @@
+{
+    "manifest_version": 3,
+    "name": "Duxiang.ai",
+    "version": "1.0",
+    "description": "一个同步阅读内容的工具.",
+    "permissions": [
+        "activeTab",
+        "scripting",
+        "commands",
+        "tabs",
+        "storage"
+    ],
+    "background": {
+      "service_worker": "background.js"
+    },
+    "action": {
+      "default_popup": "popup.html",
+      "default_icon": {
+        "16": "icons/octpus_blue_16.png",
+        "48": "icons/octpus_blue_48.png",
+        "128": "icons/octpus_blue_128.png"
+      }
+    },
+    "commands": {
+      "save_reading_url": {
+        "suggested_key": {
+          "default": "Shift+Alt+S"
+        },
+        "description": "显示保存的阅读内容"
+      }
+    },
+    "icons": {
+      "16": "icons/octpus_blue_16.png",
+      "48": "icons/octpus_blue_48.png",
+      "128": "icons/octpus_blue_128.png"
+    }
+  }
