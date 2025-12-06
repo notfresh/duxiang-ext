@@ -11,10 +11,11 @@ import { formatDate, parseTags } from './utils.js';
  * @param {number} index - 链接索引
  * @param {Function} onDelete - 删除回调函数
  * @param {Function} onEdit - 编辑回调函数
+ * @param {Function} onPin - 置顶回调函数
  * @param {Function} onLog - 日志回调函数（可选，用于调试）
  * @returns {HTMLElement} 链接卡片元素
  */
-export function createLinkCard(link, index, onDelete, onEdit, onLog = null) {
+export function createLinkCard(link, index, onDelete, onEdit, onPin, onLog = null) {
   const card = document.createElement('div');
   card.className = 'link-card';
   
@@ -33,6 +34,21 @@ export function createLinkCard(link, index, onDelete, onEdit, onLog = null) {
   buttonContainer.className = 'card-actions';
   buttonContainer.style.display = 'flex';
   buttonContainer.style.gap = '4px';
+  
+  // 置顶按钮
+  const pinBtn = document.createElement('button');
+  pinBtn.className = 'pin-btn';
+  const isPinned = link.pinned || false;
+  pinBtn.innerHTML = isPinned ? '📌' : '○'; // 已置顶显示图钉，未置顶显示空心圆
+  pinBtn.title = isPinned ? '取消置顶' : '置顶';
+  if (isPinned) {
+    pinBtn.classList.add('pinned');
+  }
+  pinBtn.addEventListener('click', function(e) {
+    e.stopPropagation(); // 阻止事件冒泡
+    onPin(link);
+  });
+  buttonContainer.appendChild(pinBtn);
   
   // 编辑按钮
   const editBtn = document.createElement('button');
@@ -114,9 +130,10 @@ export function createLinkCard(link, index, onDelete, onEdit, onLog = null) {
  * @param {Array} links - 链接数组
  * @param {Function} onDelete - 删除回调函数
  * @param {Function} onEdit - 编辑回调函数
+ * @param {Function} onPin - 置顶回调函数
  * @param {Function} onLog - 日志回调函数（可选）
  */
-export function renderLinks(container, links, onDelete, onEdit, onLog = null) {
+export function renderLinks(container, links, onDelete, onEdit, onPin, onLog = null) {
   // 清空容器
   container.innerHTML = '';
   
@@ -131,7 +148,7 @@ export function renderLinks(container, links, onDelete, onEdit, onLog = null) {
       onLog(`渲染第 ${index + 1} 条链接: ${link.title || '无标题'}`);
     }
     
-    const linkCard = createLinkCard(link, index, onDelete, onEdit, onLog);
+    const linkCard = createLinkCard(link, index, onDelete, onEdit, onPin, onLog);
     container.appendChild(linkCard);
   });
 }

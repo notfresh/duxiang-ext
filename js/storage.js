@@ -127,8 +127,18 @@ export async function loadLinks() {
     const store = getStore(db, STORE_NAME, 'readonly');
     const links = await getAll(store);
     
-    // 按时间戳倒序排序（最新的在前）
+    // 排序：置顶的在前，然后按时间戳倒序排序（最新的在前）
     return links.sort((a, b) => {
+      // 先按置顶状态排序（置顶的在前）
+      const aPinned = a.pinned || false;
+      const bPinned = b.pinned || false;
+      if (aPinned !== bPinned) {
+        // 如果 a 置顶，a 排在前面（返回负数）
+        // 如果 b 置顶，b 排在前面（返回正数）
+        return aPinned ? -1 : 1;
+      }
+      
+      // 如果置顶状态相同，按时间戳倒序排序
       const timeA = new Date(a.timestamp || 0).getTime();
       const timeB = new Date(b.timestamp || 0).getTime();
       return timeB - timeA;
@@ -273,6 +283,31 @@ export async function batchAddLinks(links) {
   }
   
   return { imported, skipped };
+}
+
+/**
+ * 切换链接的置顶状态
+ * @param {number} id - 链接 ID
+ * @returns {Promise<void>}
+ */
+export async function togglePinLink(id) {
+  try {
+    const db = await initDB();
+    const store = getStore(db, STORE_NAME, 'readwrite');
+    
+    // 先获取现有数据
+    const existing = await get(store, id);
+    if (!existing) {
+      throw new Error('链接不存在');
+    }
+    
+    // 切换置顶状态
+    const updated = { ...existing, pinned: !existing.pinned, id };
+    await put(store, updated);
+  } catch (error) {
+    console.error('切换置顶状态失败:', error);
+    throw error;
+  }
 }
 
 /**

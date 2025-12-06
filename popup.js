@@ -1,7 +1,7 @@
 // 导入模块
 import { showStatus, log } from './js/utils.js';
 import { renderLinks, showEmptyState, showSearchEmptyState } from './js/render.js';
-import { loadLinks, deleteLink as deleteLinkFromStorage, updateLink, exportLinks } from './js/storage.js';
+import { loadLinks, deleteLink as deleteLinkFromStorage, updateLink, exportLinks, batchAddLinks, togglePinLink } from './js/storage.js';
 import { importBookmarks } from './js/bookmarks.js';
 import { setupSearch } from './js/search.js';
 
@@ -10,6 +10,8 @@ document.addEventListener('DOMContentLoaded', function() {
   const linksContainer = document.getElementById('linksContainer');
   const refreshBtn = document.getElementById('refreshBtn');
   const importBookmarksBtn = document.getElementById('importBookmarksBtn');
+  const importJsonBtn = document.getElementById('importJsonBtn');
+  const jsonFileInput = document.getElementById('jsonFileInput');
   const exportBtn = document.getElementById('exportBtn');
   const debugBtn = document.getElementById('debugBtn');
   const statusMessage = document.getElementById('statusMessage');
@@ -126,6 +128,7 @@ document.addEventListener('DOMContentLoaded', function() {
       links,
       handleDeleteLink,
       handleEditLink,
+      handlePinLink,
       isDebugMode ? logMessage : null
     );
   }
@@ -192,6 +195,29 @@ document.addEventListener('DOMContentLoaded', function() {
   // 编辑链接处理函数
   function handleEditLink(link) {
     showEditDialog(link);
+  }
+  
+  // 置顶链接处理函数
+  async function handlePinLink(link) {
+    if (!link || !link.id) {
+      showStatusMessage('操作失败：无效的链接', true);
+      return;
+    }
+    
+    try {
+      // 切换置顶状态
+      await togglePinLink(link.id);
+      
+      const isPinned = link.pinned || false;
+      showStatusMessage(isPinned ? '已取消置顶' : '已置顶');
+      logMessage(`${isPinned ? '取消置顶' : '置顶'}链接: ${link.title || '无标题'}`);
+      
+      // 重新加载链接列表
+      await loadLinksFromStorage();
+    } catch (error) {
+      logMessage('切换置顶状态失败: ' + error.message);
+      showStatusMessage('操作失败', true);
+    }
   }
   
   // 保存编辑
@@ -355,9 +381,128 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
   
+  // 导入 JSON 文件
+  async function handleImportJson() {
+    // 触发文件选择
+    jsonFileInput.click();
+  }
+  
+  // 处理文件选择
+  jsonFileInput.addEventListener('change', async function(event) {
+    const file = event.target.files[0];
+    if (!file) {
+      return;
+    }
+    
+    // 验证文件类型
+    if (!file.name.endsWith('.json')) {
+      showStatusMessage('请选择 JSON 格式的文件', true);
+      // 重置文件输入
+      jsonFileInput.value = '';
+      return;
+    }
+    
+    // 禁用按钮，防止重复点击
+    importJsonBtn.disabled = true;
+    importJsonBtn.textContent = '导入中...';
+    
+    try {
+      showStatusMessage('正在读取文件...');
+      logMessage('开始导入 JSON 文件');
+      
+      // 读取文件内容
+      const fileContent = await readFileAsText(file);
+      
+      // 解析 JSON
+      let links;
+      try {
+        links = JSON.parse(fileContent);
+      } catch (parseError) {
+        throw new Error('JSON 文件格式错误，无法解析');
+      }
+      
+      // 验证数据格式
+      if (!Array.isArray(links)) {
+        throw new Error('JSON 文件格式错误：数据必须是数组格式');
+      }
+      
+      if (links.length === 0) {
+        showStatusMessage('JSON 文件中没有数据');
+        // 重置文件输入
+        jsonFileInput.value = '';
+        return;
+      }
+      
+      // 验证每条数据的格式
+      const validLinks = [];
+      for (let i = 0; i < links.length; i++) {
+        const link = links[i];
+        if (link && typeof link === 'object') {
+          // 至少需要有 title 或 url
+          if (link.title || link.url) {
+            validLinks.push(link);
+          } else {
+            logMessage(`跳过第 ${i + 1} 条无效数据：缺少 title 或 url`);
+          }
+        } else {
+          logMessage(`跳过第 ${i + 1} 条无效数据：不是对象格式`);
+        }
+      }
+      
+      if (validLinks.length === 0) {
+        throw new Error('JSON 文件中没有有效的数据');
+      }
+      
+      showStatusMessage(`正在导入 ${validLinks.length} 条链接...`);
+      logMessage(`准备导入 ${validLinks.length} 条有效链接（共 ${links.length} 条）`);
+      
+      // 使用 batchAddLinks 批量导入（会自动处理重复的 URL）
+      const result = await batchAddLinks(validLinks);
+      const imported = result.imported;
+      const skipped = result.skipped;
+      
+      // 显示结果
+      let resultMessage = `导入完成！成功导入 ${imported} 条链接`;
+      if (skipped > 0) {
+        resultMessage += `，跳过 ${skipped} 条重复链接`;
+      }
+      if (validLinks.length < links.length) {
+        resultMessage += `（共 ${links.length} 条，${validLinks.length} 条有效）`;
+      }
+      
+      showStatusMessage(resultMessage);
+      logMessage(resultMessage);
+      
+      // 重新加载链接列表
+      await loadLinksFromStorage();
+      
+    } catch (error) {
+      const errorMsg = error.message || '未知错误';
+      logMessage('导入 JSON 文件失败: ' + errorMsg);
+      showStatusMessage('导入失败: ' + errorMsg, true);
+    } finally {
+      // 恢复按钮状态
+      importJsonBtn.disabled = false;
+      importJsonBtn.textContent = '导入 JSON';
+      // 重置文件输入，允许再次选择同一文件
+      jsonFileInput.value = '';
+    }
+  });
+  
+  // 读取文件为文本
+  function readFileAsText(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = (e) => reject(new Error('读取文件失败'));
+      reader.readAsText(file, 'UTF-8');
+    });
+  }
+  
   // 绑定按钮事件
   refreshBtn.addEventListener('click', loadLinksFromStorage);
   importBookmarksBtn.addEventListener('click', handleImportBookmarks);
+  importJsonBtn.addEventListener('click', handleImportJson);
   exportBtn.addEventListener('click', exportData);
   debugBtn.addEventListener('click', toggleDebugMode);
   

@@ -119,6 +119,45 @@
       color: white;
     }
     
+    /* 置顶按钮样式 */
+    .pin-btn {
+      background-color: transparent;
+      color: #999;
+      border: none;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
+      transition: all 0.2s;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+    
+    /* 未置顶状态：灰色空心圆 */
+    .pin-btn:not(.pinned) {
+      color: #999;
+    }
+    
+    .pin-btn:not(.pinned):hover {
+      background-color: #FF9800;
+      color: white;
+    }
+    
+    /* 已置顶状态：橙色实心圆 */
+    .pin-btn.pinned {
+      color: #FF9800;
+    }
+    
+    .pin-btn.pinned:hover {
+      background-color: #FF9800;
+      color: white;
+    }
+    
     /* 编辑按钮样式 */
     .edit-btn {
       background-color: transparent;
@@ -404,9 +443,12 @@
   <div class="controls">
     <button id="refreshBtn">刷新</button>
     <button id="importBookmarksBtn">导入收藏夹</button>
+    <button id="importJsonBtn">导入 JSON</button>
     <button id="exportBtn">导出</button>
     <button id="debugBtn">调试</button>
   </div>
+  <!-- 隐藏的文件输入，用于导入 JSON -->
+  <input type="file" id="jsonFileInput" accept=".json" style="display: none;">
   <div id="statusMessage" class="status-message" style="display: none;">加载中...</div>
   <div id="debugPanel" class="debug-panel">调试信息面板</div>
 
