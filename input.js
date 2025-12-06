@@ -1,3 +1,6 @@
+// 导入存储模块
+import { addLink } from './js/storage.js';
+
 document.addEventListener('DOMContentLoaded', () => {
     console.log('页面已加载');
     
@@ -29,7 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // 保存按钮点击事件
-    const handleSave = () => {
+    const handleSave = async () => {
         console.log('保存按钮被点击');
         const title = titleInput.value.trim();
         const url = urlInput.value.trim();
@@ -54,34 +57,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     timestamp: new Date().toISOString() // 添加时间戳便于排序
                 };
                 
-                // 从chrome.storage获取现有链接
-                chrome.storage.local.get(['readingLinks'], function(result) {
-                    let savedLinks = result.readingLinks || [];
-                    
-                    // 确保savedLinks是数组
-                    if (!Array.isArray(savedLinks)) {
-                        console.log('现有数据不是数组，创建新数组');
-                        savedLinks = [];
-                    }
-                    
-                    console.log('读取到现有的链接数据，共', savedLinks.length, '条');
-                    
-                    // 添加到数组开头（最新的在前面）
-                    savedLinks.unshift(newLink);
-                    console.log('添加新链接后，现在共有', savedLinks.length, '条数据');
-                    
-                    // 保存更新后的数组
-                    chrome.storage.local.set({readingLinks: savedLinks}, function() {
-                        console.log('保存成功');
-                        
-                        // 关闭窗口
-                        console.log('即将关闭窗口');
-                        window.close();
-                    });
-                });
+                // 使用 IndexedDB 保存
+                await addLink(newLink);
+                console.log('保存成功');
+                
+                // 关闭窗口
+                console.log('即将关闭窗口');
+                window.close();
             } catch (error) {
                 console.error('保存数据时发生错误:', error);
-                alert('保存数据时出错: ' + error.message);
+                const errorMessage = error.message || '未知错误';
+                alert('保存数据时出错: ' + errorMessage);
             }
         } else {
             console.error('标题和链接不能为空');
@@ -127,4 +113,4 @@ document.addEventListener('DOMContentLoaded', () => {
     // 自动聚焦到标题输入框
     titleInput.focus();
     console.log('初始化完成，焦点设置在标题输入框');
-}); 
+});
