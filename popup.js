@@ -4,6 +4,7 @@ import { renderLinks, showEmptyState, showSearchEmptyState } from './js/render.j
 import { loadLinks, deleteLink as deleteLinkFromStorage, updateLink, exportLinks, batchAddLinks, togglePinLink } from './js/storage.js';
 import { importBookmarks } from './js/bookmarks.js';
 import { setupSearch } from './js/search.js';
+import { loadSettings, saveSettings, updateCompactModeSettings } from './js/settings.js';
 
 document.addEventListener('DOMContentLoaded', function() {
   // 获取DOM元素
@@ -29,11 +30,24 @@ document.addEventListener('DOMContentLoaded', function() {
   const editCancelBtn = document.getElementById('editCancelBtn');
   const editSaveBtn = document.getElementById('editSaveBtn');
   
+  // 设置对话框元素
+  const settingsBtn = document.getElementById('settingsBtn');
+  const settingsDialogOverlay = document.getElementById('settingsDialogOverlay');
+  const compactModeCheckbox = document.getElementById('compactModeCheckbox');
+  const showUrlCheckbox = document.getElementById('showUrlCheckbox');
+  const showDateCheckbox = document.getElementById('showDateCheckbox');
+  const showTagsCheckbox = document.getElementById('showTagsCheckbox');
+  const titleMaxCharsInput = document.getElementById('titleMaxCharsInput');
+  const urlMaxCharsInput = document.getElementById('urlMaxCharsInput');
+  const settingsCancelBtn = document.getElementById('settingsCancelBtn');
+  const settingsSaveBtn = document.getElementById('settingsSaveBtn');
+  
   // 状态管理
   let isDebugMode = false;
   let loadedLinks = [];
   let currentEditingLink = null; // 当前正在编辑的链接
   let updateSearchFn = null; // 搜索更新函数
+  let currentSettings = null; // 当前设置
   
   // 包装工具函数，传入DOM元素
   const showStatusMessage = (message, isError = false) => {
@@ -131,6 +145,14 @@ document.addEventListener('DOMContentLoaded', function() {
       handlePinLink,
       isDebugMode ? logMessage : null
     );
+    
+    // 渲染后应用文本截断
+    if (currentSettings) {
+      const cards = linksContainer.querySelectorAll('.link-card');
+      cards.forEach(card => {
+        applyTextTruncation(card, currentSettings);
+      });
+    }
   }
   
   // 处理搜索结果
@@ -342,7 +364,7 @@ document.addEventListener('DOMContentLoaded', function() {
     } finally {
       // 恢复按钮状态
       importBookmarksBtn.disabled = false;
-      importBookmarksBtn.textContent = '导入收藏夹';
+      importBookmarksBtn.textContent = '导入系统收藏夹';
     }
   }
   
@@ -499,6 +521,243 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
   
+  // ========== 设置功能 ==========
+  
+  /**
+   * 加载并应用设置
+   */
+  async function loadAndApplySettings() {
+    try {
+      currentSettings = await loadSettings();
+      applySettingsToUI(currentSettings);
+    } catch (error) {
+      logMessage('加载设置失败: ' + error.message);
+      // 使用默认设置
+      currentSettings = await loadSettings();
+      applySettingsToUI(currentSettings);
+    }
+  }
+  
+  /**
+   * 截断文本并添加省略号
+   * @param {string} text - 原始文本
+   * @param {number} maxChars - 最大字符数（0表示不限制）
+   * @returns {string} 截断后的文本
+   */
+  function truncateText(text, maxChars) {
+    if (!text) return '';
+    if (!maxChars || maxChars <= 0) {
+      return text;
+    }
+    if (text.length <= maxChars) {
+      return text;
+    }
+    return text.substring(0, maxChars) + '...';
+  }
+  
+  /**
+   * 应用文本截断到链接卡片
+   * @param {HTMLElement} card - 链接卡片元素
+   * @param {Object} settings - 设置对象
+   */
+  function applyTextTruncation(card, settings) {
+    const compactMode = settings.compactMode || {};
+    const titleMaxChars = compactMode.titleMaxChars || 0;
+    const urlMaxChars = compactMode.urlMaxChars || 0;
+    
+    // 处理标题（现在是 <a> 标签）
+    const titleElement = card.querySelector('.link-title');
+    if (titleElement && titleMaxChars > 0) {
+      const originalTitle = titleElement.getAttribute('data-original-title') || titleElement.textContent;
+      titleElement.setAttribute('data-original-title', originalTitle);
+      const truncatedTitle = truncateText(originalTitle, titleMaxChars);
+      titleElement.textContent = truncatedTitle;
+      // 悬停显示完整内容（保留原始title，如果已设置）
+      if (originalTitle && originalTitle !== truncatedTitle) {
+        titleElement.title = originalTitle;
+      }
+    } else if (titleElement) {
+      // 如果不限制，确保显示完整内容
+      const originalTitle = titleElement.getAttribute('data-original-title');
+      if (originalTitle) {
+        titleElement.textContent = originalTitle;
+        titleElement.removeAttribute('data-original-title');
+        // 保留title属性（用于悬停提示）
+        if (titleElement.title === originalTitle) {
+          titleElement.title = originalTitle; // 保持原样
+        }
+      }
+    }
+    
+    // 处理URL
+    const urlElement = card.querySelector('.link-url a');
+    if (urlElement && urlMaxChars > 0) {
+      const originalUrl = urlElement.getAttribute('data-original-url') || urlElement.textContent;
+      urlElement.setAttribute('data-original-url', originalUrl);
+      const truncatedUrl = truncateText(originalUrl, urlMaxChars);
+      urlElement.textContent = truncatedUrl;
+      urlElement.title = originalUrl; // 悬停显示完整内容
+    } else if (urlElement) {
+      // 如果不限制，确保显示完整内容
+      const originalUrl = urlElement.getAttribute('data-original-url');
+      if (originalUrl) {
+        urlElement.textContent = originalUrl;
+        urlElement.removeAttribute('data-original-url');
+        urlElement.removeAttribute('title');
+      }
+    }
+  }
+  
+  /**
+   * 应用设置到UI
+   * @param {Object} settings - 设置对象
+   */
+  function applySettingsToUI(settings) {
+    const compactMode = settings.compactMode || {};
+    
+    // 应用紧凑模式类
+    if (compactMode.enabled) {
+      linksContainer.classList.add('compact-mode');
+    } else {
+      linksContainer.classList.remove('compact-mode');
+    }
+    
+    // 应用显示/隐藏选项
+    // 注意：showUrl/showDate/showTags 为 true 时显示，false 时隐藏
+    // 所以类名是 hide-url/hide-date/hide-tags（隐藏时添加）
+    if (compactMode.showUrl === false) {
+      linksContainer.classList.add('hide-url');
+    } else {
+      linksContainer.classList.remove('hide-url');
+    }
+    
+    if (compactMode.showDate === false) {
+      linksContainer.classList.add('hide-date');
+    } else {
+      linksContainer.classList.remove('hide-date');
+    }
+    
+    if (compactMode.showTags === false) {
+      linksContainer.classList.add('hide-tags');
+    } else {
+      linksContainer.classList.remove('hide-tags');
+    }
+    
+    // 应用文本截断
+    if (currentSettings) {
+      const cards = linksContainer.querySelectorAll('.link-card');
+      cards.forEach(card => {
+        applyTextTruncation(card, currentSettings);
+      });
+    }
+  }
+  
+  /**
+   * 显示设置对话框
+   */
+  function showSettingsDialog() {
+    if (!currentSettings) {
+      return;
+    }
+    
+    const compactMode = currentSettings.compactMode || {};
+    
+    // 填充当前设置值
+    compactModeCheckbox.checked = compactMode.enabled || false;
+    showUrlCheckbox.checked = compactMode.showUrl !== false; // 默认为 true
+    showDateCheckbox.checked = compactMode.showDate !== false; // 默认为 true
+    showTagsCheckbox.checked = compactMode.showTags !== false; // 默认为 true
+    titleMaxCharsInput.value = compactMode.titleMaxChars || 0;
+    urlMaxCharsInput.value = compactMode.urlMaxChars || 0;
+    
+    // 显示对话框
+    settingsDialogOverlay.classList.add('show');
+  }
+  
+  /**
+   * 隐藏设置对话框
+   */
+  function hideSettingsDialog() {
+    settingsDialogOverlay.classList.remove('show');
+  }
+  
+  /**
+   * 保存设置
+   */
+  async function saveSettingsAndApply() {
+    try {
+      const compactModeEnabled = compactModeCheckbox.checked;
+      const showUrl = showUrlCheckbox.checked;
+      const showDate = showDateCheckbox.checked;
+      const showTags = showTagsCheckbox.checked;
+      const titleMaxChars = parseInt(titleMaxCharsInput.value) || 0;
+      const urlMaxChars = parseInt(urlMaxCharsInput.value) || 0;
+      
+      // 验证输入
+      if (titleMaxChars < 0 || urlMaxChars < 0) {
+        showStatusMessage('字符数不能为负数', true);
+        return;
+      }
+      
+      // 更新设置
+      const updatedSettings = await updateCompactModeSettings({
+        enabled: compactModeEnabled,
+        showUrl: showUrl,
+        showDate: showDate,
+        showTags: showTags,
+        titleMaxChars: titleMaxChars,
+        urlMaxChars: urlMaxChars
+      });
+      
+      currentSettings = updatedSettings;
+      
+      // 应用设置到UI
+      applySettingsToUI(currentSettings);
+      
+      // 重新渲染链接列表（以便应用新的样式和截断）
+      if (loadedLinks.length > 0) {
+        renderLinksList(loadedLinks);
+      }
+      
+      showStatusMessage('设置已保存');
+      const logMsg = `设置已保存: 紧凑模式 ${compactModeEnabled ? '已启用' : '已禁用'}, ` +
+                     `显示网址: ${showUrl ? '是' : '否'}, ` +
+                     `显示日期: ${showDate ? '是' : '否'}, ` +
+                     `显示标签: ${showTags ? '是' : '否'}, ` +
+                     `标题最大字符数: ${titleMaxChars || '不限制'}, ` +
+                     `URL最大字符数: ${urlMaxChars || '不限制'}`;
+      logMessage(logMsg);
+      
+      // 隐藏对话框
+      hideSettingsDialog();
+    } catch (error) {
+      const errorMsg = error.message || '未知错误';
+      logMessage('保存设置失败: ' + errorMsg);
+      showStatusMessage('保存设置失败: ' + errorMsg, true);
+    }
+  }
+  
+  // 绑定设置对话框事件
+  settingsBtn.addEventListener('click', showSettingsDialog);
+  settingsCancelBtn.addEventListener('click', hideSettingsDialog);
+  settingsSaveBtn.addEventListener('click', saveSettingsAndApply);
+  
+  // 点击遮罩层关闭设置对话框
+  settingsDialogOverlay.addEventListener('click', function(e) {
+    if (e.target === settingsDialogOverlay) {
+      hideSettingsDialog();
+    }
+  });
+  
+  // ESC 键关闭设置对话框
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && settingsDialogOverlay.classList.contains('show')) {
+      hideSettingsDialog();
+    }
+  });
+  
+  // ========== 设置功能结束 ==========
+  
   // 绑定按钮事件
   refreshBtn.addEventListener('click', loadLinksFromStorage);
   importBookmarksBtn.addEventListener('click', handleImportBookmarks);
@@ -507,5 +766,8 @@ document.addEventListener('DOMContentLoaded', function() {
   debugBtn.addEventListener('click', toggleDebugMode);
   
   // 初始加载
-  loadLinksFromStorage();
+  // 先加载设置，再加载链接
+  loadAndApplySettings().then(() => {
+    loadLinksFromStorage();
+  });
 }); 

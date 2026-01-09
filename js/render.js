@@ -23,10 +23,13 @@ export function createLinkCard(link, index, onDelete, onEdit, onPin, onLog = nul
   const cardHeader = document.createElement('div');
   cardHeader.className = 'card-header';
   
-  // 标题
-  const title = document.createElement('div');
+  // 标题（可点击）
+  const title = document.createElement('a');
   title.className = 'link-title';
+  title.href = link.url;
   title.textContent = link.title || '无标题';
+  title.target = '_blank';
+  title.title = link.title || '无标题'; // 悬停提示
   cardHeader.appendChild(title);
   
   // 按钮容器

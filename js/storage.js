@@ -6,7 +6,7 @@
 import { openDB, getStore, add, get, getAll, put, del } from './idb.js';
 
 const DB_NAME = 'readingLinks';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = 'links';
 
 let dbInstance = null;
@@ -21,13 +21,18 @@ async function initDB() {
   }
   
   dbInstance = await openDB(DB_NAME, DB_VERSION, (db, oldVersion, newVersion) => {
-    // 创建对象存储
+    // 创建链接对象存储
     if (!db.objectStoreNames.contains(STORE_NAME)) {
       const store = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
       
       // 创建索引
       store.createIndex('url', 'url', { unique: true }); // URL 唯一索引
       store.createIndex('timestamp', 'timestamp'); // 时间戳索引
+    }
+    
+    // 创建设置对象存储（版本2新增）
+    if (newVersion >= 2 && !db.objectStoreNames.contains('settings')) {
+      db.createObjectStore('settings', { keyPath: 'key' });
     }
   });
   
