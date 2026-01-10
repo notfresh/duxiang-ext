@@ -118,40 +118,69 @@ export async function importBookmarks(onProgress = null) {
         let skipped = 0;
         const total = allBookmarks.length;
         
-        for (let i = 0; i < allBookmarks.length; i++) {
-          const bookmark = allBookmarks[i];
-          
-          try {
-            // 转换为链接格式
-            const link = convertBookmarkToLink(bookmark, bookmarkMap);
-            
-            if (!link) {
-              skipped++;
-              continue;
-            }
-            
-            // 检查是否重复
-            const isDuplicate = await checkDuplicate(link.url);
-            
-            if (isDuplicate) {
-              skipped++;
-            } else {
-              // 添加到存储
-              await addLink(link);
-              imported++;
-            }
-            
-            // 报告进度（processed 是已处理的条数）
-            if (onProgress) {
-              onProgress(imported, skipped, i + 1, total);
-            }
-          } catch (error) {
-            console.error('导入书签失败:', error, bookmark);
-            skipped++;
-          }
-        }
+        console.log(`[importBookmarks] 开始导入 ${total} 条书签...`);
         
-        resolve({ imported, skipped, total });
+        try {
+          for (let i = 0; i < allBookmarks.length; i++) {
+            const bookmark = allBookmarks[i];
+            
+            try {
+              // 转换为链接格式
+              const link = convertBookmarkToLink(bookmark, bookmarkMap);
+              
+              if (!link) {
+                skipped++;
+                continue;
+              }
+              
+              // 检查是否重复
+              let isDuplicate = false;
+              try {
+                console.log(`[importBookmarks] 第 ${i + 1}/${total} 条，检查重复: ${link.url.substring(0, 50)}`);
+                isDuplicate = await checkDuplicate(link.url);
+              } catch (error) {
+                console.error(`[importBookmarks] 检查重复失败 (第 ${i + 1} 条):`, error);
+                // 如果检查失败，继续尝试添加（可能会因为重复而失败）
+              }
+              
+              if (isDuplicate) {
+                skipped++;
+                console.log(`[importBookmarks] 第 ${i + 1} 条 URL 重复，跳过`);
+              } else {
+                // 添加到存储
+                try {
+                  console.log(`[importBookmarks] 第 ${i + 1} 条，开始添加...`);
+                  const id = await addLink(link);
+                  imported++;
+                  console.log(`[importBookmarks] 第 ${i + 1} 条添加成功，ID: ${id}`);
+                } catch (error) {
+                  // 如果是因为重复而失败，跳过
+                  if (error.message?.includes('已存在') || error.name === 'ConstraintError') {
+                    skipped++;
+                    console.log(`[importBookmarks] 第 ${i + 1} 条 URL 重复，跳过`);
+                  } else {
+                    console.error(`[importBookmarks] 第 ${i + 1} 条添加失败:`, error.name, error.message);
+                    skipped++;
+                  }
+                }
+              }
+              
+              // 报告进度（processed 是已处理的条数）
+              if (onProgress) {
+                onProgress(imported, skipped, i + 1, total);
+              }
+            } catch (error) {
+              console.error(`[importBookmarks] 第 ${i + 1} 条处理失败:`, error.name, error.message);
+              skipped++;
+            }
+          }
+          
+          console.log(`[importBookmarks] 导入完成: 成功 ${imported} 条，跳过 ${skipped} 条，共 ${total} 条`);
+          resolve({ imported, skipped, total });
+        } catch (error) {
+          console.error('[importBookmarks] 导入过程出错:', error);
+          reject(error);
+        }
       })();
     });
   });

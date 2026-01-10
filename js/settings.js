@@ -3,34 +3,19 @@
  * 使用 IndexedDB 存储用户设置
  */
 
-import { openDB, getStore, get, put } from './idb.js';
+import { getStore, get, put } from './idb.js';
+import { getDBInstance } from './storage.js'; // 复用 storage.js 的数据库连接
 
-const DB_NAME = 'readingLinks';
-const DB_VERSION = 2;
 const SETTINGS_STORE_NAME = 'settings';
 const SETTINGS_KEY = 'userSettings';
 
-let dbInstance = null;
-
 /**
- * 初始化数据库（复用现有的数据库）
+ * 获取数据库实例（复用 storage.js 的连接，避免重复打开导致冲突）
  * @returns {Promise<IDBDatabase>} 数据库实例
  */
-async function initDB() {
-  if (dbInstance) {
-    return dbInstance;
-  }
-  
-  dbInstance = await openDB(DB_NAME, DB_VERSION, (db, oldVersion, newVersion) => {
-    // 创建设置对象存储（如果不存在）
-    // 注意：如果数据库已由 storage.js 升级到版本2，这里可能不会执行
-    // 但 storage.js 中已经创建了 settings 存储，所以这里是安全的
-    if (!db.objectStoreNames.contains(SETTINGS_STORE_NAME)) {
-      db.createObjectStore(SETTINGS_STORE_NAME, { keyPath: 'key' });
-    }
-  });
-  
-  return dbInstance;
+async function getDB() {
+  console.log('[settings] 复用 storage.js 的数据库连接');
+  return await getDBInstance();
 }
 
 /**
@@ -61,7 +46,7 @@ export function getDefaultSettings() {
  */
 export async function loadSettings() {
   try {
-    const db = await initDB();
+    const db = await getDB();
     const store = getStore(db, SETTINGS_STORE_NAME, 'readonly');
     
     const result = await get(store, SETTINGS_KEY);
@@ -95,7 +80,7 @@ export async function loadSettings() {
  */
 export async function saveSettings(settings) {
   try {
-    const db = await initDB();
+    const db = await getDB();
     const store = getStore(db, SETTINGS_STORE_NAME, 'readwrite');
     
     const settingsData = {

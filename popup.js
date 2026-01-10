@@ -1,7 +1,7 @@
 // 导入模块
 import { showStatus, log } from './js/utils.js';
 import { renderLinks, showEmptyState, showSearchEmptyState } from './js/render.js';
-import { loadLinks, deleteLink as deleteLinkFromStorage, updateLink, exportLinks, batchAddLinks, togglePinLink } from './js/storage.js';
+import { loadLinks, deleteLink as deleteLinkFromStorage, updateLink, exportLinks, batchAddLinks, togglePinLink, clearDatabase as clearDatabaseFromStorage } from './js/storage.js';
 import { importBookmarks } from './js/bookmarks.js';
 import { setupSearch } from './js/search.js';
 import { loadSettings, saveSettings, updateCompactModeSettings } from './js/settings.js';
@@ -9,11 +9,12 @@ import { loadSettings, saveSettings, updateCompactModeSettings } from './js/sett
 document.addEventListener('DOMContentLoaded', function() {
   // 获取DOM元素
   const linksContainer = document.getElementById('linksContainer');
-  const refreshBtn = document.getElementById('refreshBtn');
+  const addBtn = document.getElementById('addBtn');
   const importBookmarksBtn = document.getElementById('importBookmarksBtn');
   const importJsonBtn = document.getElementById('importJsonBtn');
   const jsonFileInput = document.getElementById('jsonFileInput');
   const exportBtn = document.getElementById('exportBtn');
+  const clearDataBtn = document.getElementById('clearDataBtn');
   const debugBtn = document.getElementById('debugBtn');
   const statusMessage = document.getElementById('statusMessage');
   const debugPanel = document.getElementById('debugPanel');
@@ -24,6 +25,7 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // 编辑对话框元素
   const editDialogOverlay = document.getElementById('editDialogOverlay');
+  const editDialogTitle = document.querySelector('#editDialogOverlay h2');
   const editTitleInput = document.getElementById('editTitleInput');
   const editUrlInput = document.getElementById('editUrlInput');
   const editTagsInput = document.getElementById('editTagsInput');
@@ -88,18 +90,28 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // 加载存储的链接
   async function loadLinksFromStorage() {
+    console.log('[loadLinksFromStorage] 开始加载数据');
     showStatusMessage('正在加载数据...');
     logMessage('开始加载链接数据');
     
     try {
+      console.log('[loadLinksFromStorage] 调用 loadLinks()...');
       // 从 IndexedDB 加载数据
       loadedLinks = await loadLinks();
+      console.log('[loadLinksFromStorage] loadLinks() 返回，数据条数:', loadedLinks?.length);
+      
+      // 确保 loadedLinks 是数组
+      if (!Array.isArray(loadedLinks)) {
+        console.error('[loadLinksFromStorage] loadedLinks 不是数组:', loadedLinks);
+        loadedLinks = [];
+      }
       
       if (isDebugMode) {
         logMessage(`获取到 ${loadedLinks.length} 条链接数据`);
       }
       
-      if (!Array.isArray(loadedLinks) || loadedLinks.length === 0) {
+      if (loadedLinks.length === 0) {
+        console.log('[loadLinksFromStorage] 没有数据，显示空状态');
         // 显示空状态
         showEmptyState(linksContainer);
         showStatusMessage('没有保存的链接');
@@ -107,11 +119,14 @@ document.addEventListener('DOMContentLoaded', function() {
       }
       
       try {
+        console.log('[loadLinksFromStorage] 开始渲染链接...');
         // 渲染链接
         renderLinksList(loadedLinks);
+        console.log('[loadLinksFromStorage] 渲染完成');
         
         // 设置搜索功能（首次加载或更新搜索数据源）
         if (!updateSearchFn) {
+          console.log('[loadLinksFromStorage] 初始化搜索功能');
           updateSearchFn = setupSearch(
             searchInput,
             clearSearchBtn,
@@ -119,19 +134,28 @@ document.addEventListener('DOMContentLoaded', function() {
             loadedLinks
           );
         } else {
+          console.log('[loadLinksFromStorage] 更新搜索数据源');
           // 更新搜索数据源
           updateSearchFn(loadedLinks);
         }
         
         showStatusMessage(`已加载 ${loadedLinks.length} 条链接`);
+        console.log('[loadLinksFromStorage] 加载完成');
       } catch (error) {
+        console.error('[loadLinksFromStorage] 渲染链接时出错:', error.name, error.message, error.stack);
         logMessage(`渲染链接时出错: ${error.message}`);
-        showStatusMessage('显示链接时出错', true);
+        showStatusMessage('显示链接时出错: ' + error.message, true);
+        // 即使渲染出错，也显示空状态
+        showEmptyState(linksContainer);
       }
     } catch (error) {
+      console.error('[loadLinksFromStorage] 加载数据错误:', error.name, error.message, error.stack);
       const errorMsg = error.message || '未知错误';
       logMessage('加载数据错误: ' + errorMsg);
       showStatusMessage('加载失败: ' + errorMsg, true);
+      // 即使加载出错，也显示空状态，避免界面卡住
+      showEmptyState(linksContainer);
+      loadedLinks = []; // 重置为空数组
     }
   }
   
@@ -198,11 +222,58 @@ document.addEventListener('DOMContentLoaded', function() {
   // 显示编辑对话框
   function showEditDialog(link) {
     currentEditingLink = link;
-    editTitleInput.value = link.title || '';
-    editUrlInput.value = link.url || '';
-    editTagsInput.value = link.tags || '';
+    if (link) {
+      // 编辑模式
+      editDialogTitle.textContent = '编辑链接';
+      editTitleInput.value = link.title || '';
+      editUrlInput.value = link.url || '';
+      editTagsInput.value = link.tags || '';
+    } else {
+      // 新增模式
+      editDialogTitle.textContent = '新增链接';
+      editTitleInput.value = '';
+      editUrlInput.value = '';
+      editTagsInput.value = '';
+    }
     editDialogOverlay.classList.add('show');
     editTitleInput.focus();
+  }
+  
+  // 获取当前标签页信息并打开新增对话框
+  async function handleAddLink() {
+    try {
+      // 获取当前活动标签页
+      const tabs = await new Promise((resolve, reject) => {
+        chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+          } else {
+            resolve(tabs);
+          }
+        });
+      });
+      
+      if (tabs.length === 0) {
+        showStatusMessage('无法获取当前标签页信息', true);
+        return;
+      }
+      
+      const currentTab = tabs[0];
+      const title = currentTab.title || '';
+      const url = currentTab.url || '';
+      
+      // 打开编辑对话框并填充当前网页信息
+      showEditDialog({
+        title: title,
+        url: url,
+        tags: ''
+      });
+    } catch (error) {
+      console.error('[handleAddLink] 获取标签页信息失败:', error);
+      showStatusMessage('获取当前网页信息失败: ' + error.message, true);
+      // 即使获取失败，也打开空的新增对话框
+      showEditDialog(null);
+    }
   }
   
   // 隐藏编辑对话框
@@ -242,12 +313,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
   
-  // 保存编辑
+  // 保存编辑或新增
   async function saveEdit() {
-    if (!currentEditingLink) {
-      return;
-    }
-    
     const title = editTitleInput.value.trim();
     const url = editUrlInput.value.trim();
     const tags = editTagsInput.value.trim();
@@ -259,15 +326,31 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     try {
-      // 更新链接
-      await updateLink(currentEditingLink.id, {
-        title: title,
-        url: url,
-        tags: tags
-      });
-      
-      showStatusMessage('链接已更新');
-      logMessage(`更新链接: ${title}`);
+      if (currentEditingLink && currentEditingLink.id) {
+        // 编辑模式：更新链接
+        await updateLink(currentEditingLink.id, {
+          title: title,
+          url: url,
+          tags: tags
+        });
+        
+        showStatusMessage('链接已更新');
+        logMessage(`更新链接: ${title}`);
+      } else {
+        // 新增模式：添加链接
+        const newLink = {
+          title: title,
+          url: url,
+          tags: tags,
+          timestamp: new Date().toISOString(),
+          pinned: false
+        };
+        
+        await addLink(newLink);
+        
+        showStatusMessage('链接已添加');
+        logMessage(`添加链接: ${title}`);
+      }
       
       // 隐藏对话框
       hideEditDialog();
@@ -276,8 +359,9 @@ document.addEventListener('DOMContentLoaded', function() {
       await loadLinksFromStorage();
     } catch (error) {
       const errorMsg = error.message || '未知错误';
-      logMessage('更新链接失败: ' + errorMsg);
-      showStatusMessage('更新失败: ' + errorMsg, true);
+      const action = currentEditingLink && currentEditingLink.id ? '更新' : '添加';
+      logMessage(`${action}链接失败: ` + errorMsg);
+      showStatusMessage(`${action}失败: ` + errorMsg, true);
     }
   }
   
@@ -479,24 +563,49 @@ document.addEventListener('DOMContentLoaded', function() {
       logMessage(`准备导入 ${validLinks.length} 条有效链接（共 ${links.length} 条）`);
       
       // 使用 batchAddLinks 批量导入（会自动处理重复的 URL）
-      const result = await batchAddLinks(validLinks);
-      const imported = result.imported;
-      const skipped = result.skipped;
+      // 添加进度反馈
+      let processedCount = 0;
+      const totalCount = validLinks.length;
+      const progressInterval = setInterval(() => {
+        if (processedCount < totalCount) {
+          showStatusMessage(`正在导入... ${processedCount} / ${totalCount} 条`);
+        }
+      }, 500); // 每 500ms 更新一次进度
       
-      // 显示结果
-      let resultMessage = `导入完成！成功导入 ${imported} 条链接`;
-      if (skipped > 0) {
-        resultMessage += `，跳过 ${skipped} 条重复链接`;
+      try {
+        console.log('[handleImportJson] 开始调用 batchAddLinks，数据条数:', validLinks.length);
+        console.log('[handleImportJson] 前2条数据示例:', validLinks.slice(0, 2));
+        const result = await batchAddLinks(validLinks);
+        clearInterval(progressInterval);
+        
+        console.log('[handleImportJson] batchAddLinks 返回结果:', result);
+        
+        const imported = result.imported;
+        const skipped = result.skipped;
+        
+        // 显示结果
+        let resultMessage = `导入完成！成功导入 ${imported} 条链接`;
+        if (skipped > 0) {
+          resultMessage += `，跳过 ${skipped} 条重复链接`;
+        }
+        if (validLinks.length < links.length) {
+          resultMessage += `（共 ${links.length} 条，${validLinks.length} 条有效）`;
+        }
+        
+        showStatusMessage(resultMessage);
+        logMessage(resultMessage);
+        console.log('导入结果:', result);
+        
+        // 重新加载链接列表
+        console.log('开始重新加载链接列表...');
+        await loadLinksFromStorage();
+        console.log('链接列表重新加载完成');
+      } catch (importError) {
+        clearInterval(progressInterval);
+        console.error('批量导入过程中出错:', importError.name, importError.message, importError.stack);
+        logMessage(`批量导入失败: ${importError.message || importError.name || '未知错误'}`);
+        throw importError;
       }
-      if (validLinks.length < links.length) {
-        resultMessage += `（共 ${links.length} 条，${validLinks.length} 条有效）`;
-      }
-      
-      showStatusMessage(resultMessage);
-      logMessage(resultMessage);
-      
-      // 重新加载链接列表
-      await loadLinksFromStorage();
       
     } catch (error) {
       const errorMsg = error.message || '未知错误';
@@ -758,16 +867,69 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // ========== 设置功能结束 ==========
   
+  // 清除所有数据
+  async function handleClearData() {
+    // 确认清除
+    if (!confirm('警告：确定要清除所有数据吗？\n\n这将删除所有保存的链接，此操作不可恢复！\n\n建议先导出数据备份。')) {
+      return;
+    }
+    
+    // 二次确认
+    if (!confirm('最后确认：真的要删除所有数据吗？')) {
+      return;
+    }
+    
+    // 禁用按钮
+    clearDataBtn.disabled = true;
+    clearDataBtn.textContent = '清除中...';
+    
+    try {
+      showStatusMessage('正在清除数据...');
+      logMessage('开始清除数据库');
+      
+      await clearDatabaseFromStorage();
+      
+      showStatusMessage('数据已清除');
+      logMessage('数据库清除成功');
+      
+      // 重新加载（会创建新的空数据库）
+      await loadLinksFromStorage();
+      
+    } catch (error) {
+      const errorMsg = error.message || '未知错误';
+      logMessage('清除数据失败: ' + errorMsg);
+      showStatusMessage('清除失败: ' + errorMsg, true);
+    } finally {
+      // 恢复按钮状态
+      clearDataBtn.disabled = false;
+      clearDataBtn.textContent = '清除数据';
+    }
+  }
+  
   // 绑定按钮事件
-  refreshBtn.addEventListener('click', loadLinksFromStorage);
+  addBtn.addEventListener('click', handleAddLink);
   importBookmarksBtn.addEventListener('click', handleImportBookmarks);
   importJsonBtn.addEventListener('click', handleImportJson);
   exportBtn.addEventListener('click', exportData);
+  clearDataBtn.addEventListener('click', handleClearData);
   debugBtn.addEventListener('click', toggleDebugMode);
   
   // 初始加载
   // 先加载设置，再加载链接
+  console.log('[popup] 开始初始加载');
   loadAndApplySettings().then(() => {
+    console.log('[popup] 设置加载完成，开始加载链接');
     loadLinksFromStorage();
+  }).catch(error => {
+    console.error('[popup] 初始加载失败:', error);
+  });
+  
+  // 测试 Service Worker 是否运行
+  chrome.runtime.sendMessage({ type: 'ping' }, (response) => {
+    if (chrome.runtime.lastError) {
+      console.warn('[popup] Service Worker 可能未运行:', chrome.runtime.lastError.message);
+    } else {
+      console.log('[popup] Service Worker 响应:', response);
+    }
   });
 }); 

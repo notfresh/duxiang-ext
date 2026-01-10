@@ -16,6 +16,14 @@
       font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
       background-color: #f5f5f5;
       padding: 0; /* 移除内边距 */
+      margin: 0;
+      overflow: hidden; /* 禁用外部滚动条 */
+    }
+    
+    body {
+      display: flex;
+      flex-direction: column;
+      max-height: 600px; /* 限制最大高度，避免超出浏览器窗口 */
     }
     
     h1 {
@@ -54,12 +62,31 @@
     #linksContainer {
       background-color: white;
       min-height: 100px;
-      max-height: 400px;
+      flex: 1; /* 占据剩余空间，自动调整高度 */
       overflow-y: auto;
+      overflow-x: hidden; /* 防止横向滚动条 */
       margin-bottom: 10px;
       padding: 10px;
       box-shadow: 0 1px 3px rgba(0,0,0,0.1);
       border-radius: 0; /* 移除圆角，使内容区域充满 */
+    }
+    
+    /* 确保滚动条样式一致 */
+    #linksContainer::-webkit-scrollbar {
+      width: 8px;
+    }
+    
+    #linksContainer::-webkit-scrollbar-track {
+      background: #f1f1f1;
+    }
+    
+    #linksContainer::-webkit-scrollbar-thumb {
+      background: #888;
+      border-radius: 4px;
+    }
+    
+    #linksContainer::-webkit-scrollbar-thumb:hover {
+      background: #555;
     }
     
     .link-card {
@@ -226,6 +253,12 @@
       max-width: 400px;
       max-height: 90vh;
       overflow-y: auto;
+    }
+    
+    /* 设置弹窗固定宽度 */
+    #settingsDialogOverlay .edit-dialog {
+      width: 800px;
+      max-width: 800px;
     }
     
     .edit-dialog h2 {
@@ -560,12 +593,11 @@
     </div>
   </div>
   <div class="controls">
-    <button id="refreshBtn">刷新</button>
+    <button id="addBtn">新增</button>
     <button id="importBookmarksBtn">导入系统收藏夹</button>
     <button id="importJsonBtn">导入</button>
     <button id="exportBtn">导出</button>
     <button id="settingsBtn">设置</button>
-    <button id="debugBtn">调试</button>
   </div>
   <!-- 隐藏的文件输入，用于导入 JSON -->
   <input type="file" id="jsonFileInput" accept=".json" style="display: none;">
@@ -632,6 +664,10 @@
           <input type="number" id="urlMaxCharsInput" min="0" value="0" style="width: 100px; padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;">
           <span style="font-size: 12px; color: #999; margin-left: 8px;">（0表示不限制）</span>
         </div>
+      </div>
+      <div class="button-group" style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee;">
+        <button id="clearDataBtn" style="background-color: #f44336; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px; margin-right: 10px;">清除数据</button>
+        <button id="debugBtn" style="background-color: #2196F3; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px; margin-right: 10px;">调试</button>
       </div>
       <div class="button-group">
         <button id="settingsCancelBtn" class="cancel-btn">取消</button>
