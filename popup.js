@@ -18,6 +18,9 @@ document.addEventListener('DOMContentLoaded', function() {
   const debugBtn = document.getElementById('debugBtn');
   const statusMessage = document.getElementById('statusMessage');
   const debugPanel = document.getElementById('debugPanel');
+  const shortcutTip = document.getElementById('shortcutTip');
+  const configureShortcutBtn = document.getElementById('configureShortcutBtn');
+  const dismissShortcutTipBtn = document.getElementById('dismissShortcutTipBtn');
   
   // 搜索相关元素
   const searchInput = document.getElementById('searchInput');
@@ -906,6 +909,63 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
   
+  // 快捷键配置提示
+  function checkAndShowShortcutTip() {
+    // 检查是否已经配置了快捷键（通过检查是否显示过提示）
+    chrome.storage.local.get(['shortcutTipDismissed'], (result) => {
+      if (!result.shortcutTipDismissed && shortcutTip) {
+        shortcutTip.style.display = 'block';
+      }
+    });
+  }
+  
+  // 检测浏览器类型
+  function getBrowserType() {
+    // 通过 userAgent 检测
+    const userAgent = navigator.userAgent.toLowerCase();
+    if (userAgent.includes('edg/')) {
+      return 'edge';
+    } else if (userAgent.includes('chrome/')) {
+      return 'chrome';
+    }
+    // 默认尝试 Chrome
+    return 'chrome';
+  }
+  
+  // 配置快捷键按钮
+  if (configureShortcutBtn) {
+    configureShortcutBtn.addEventListener('click', () => {
+      // 根据浏览器类型选择正确的 URL
+      const browserType = getBrowserType();
+      const shortcutsUrl = browserType === 'edge' 
+        ? 'edge://extensions/shortcuts' 
+        : 'chrome://extensions/shortcuts';
+      
+      chrome.tabs.create({
+        url: shortcutsUrl
+      }, () => {
+        // 如果打开失败，尝试另一个浏览器的 URL
+        if (chrome.runtime.lastError) {
+          const altUrl = browserType === 'edge' 
+            ? 'chrome://extensions/shortcuts' 
+            : 'edge://extensions/shortcuts';
+          chrome.tabs.create({ url: altUrl });
+        }
+      });
+    });
+  }
+  
+  // 不再提示按钮
+  if (dismissShortcutTipBtn) {
+    dismissShortcutTipBtn.addEventListener('click', () => {
+      chrome.storage.local.set({ shortcutTipDismissed: true }, () => {
+        if (shortcutTip) {
+          shortcutTip.style.display = 'none';
+        }
+      });
+    });
+  }
+  
   // 绑定按钮事件
   addBtn.addEventListener('click', handleAddLink);
   importBookmarksBtn.addEventListener('click', handleImportBookmarks);
@@ -920,6 +980,8 @@ document.addEventListener('DOMContentLoaded', function() {
   loadAndApplySettings().then(() => {
     console.log('[popup] 设置加载完成，开始加载链接');
     loadLinksFromStorage();
+    // 检查并显示快捷键配置提示
+    checkAndShowShortcutTip();
   }).catch(error => {
     console.error('[popup] 初始加载失败:', error);
   });

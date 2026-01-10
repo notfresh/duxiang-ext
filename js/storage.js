@@ -54,7 +54,7 @@ async function initDB() {
     dbInstance = await openDB(DB_NAME, DB_VERSION, (db, oldVersion, newVersion) => {
       console.log(`[initDB] 数据库升级: ${oldVersion} -> ${newVersion}`);
       
-      // 创建链接对象存储
+      // 创建链接对象存储（如果不存在）
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         console.log(`[initDB] 创建对象存储: ${STORE_NAME}`);
         const store = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
@@ -87,6 +87,50 @@ async function initDB() {
     
     console.log('[initDB] 数据库初始化成功，版本:', dbInstance.version);
     console.log('[initDB] 对象存储:', Array.from(dbInstance.objectStoreNames).join(', '));
+    
+    // 检查关键对象存储是否存在，如果不存在则强制升级
+    if (!dbInstance.objectStoreNames.contains(STORE_NAME)) {
+      console.warn('[initDB] ⚠️ 检测到 links 对象存储不存在，强制重建数据库');
+      dbInstance.close();
+      dbInstance = null;
+      
+      // 删除旧数据库，重新创建
+      try {
+        await deleteDB(DB_NAME);
+        console.log('[initDB] 已删除旧数据库，等待重新创建...');
+        // 等待一小段时间，确保删除完成
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (error) {
+        console.warn('[initDB] 删除数据库失败:', error);
+      }
+      
+      // 重新打开数据库（会触发升级，创建对象存储）
+      // 使用新的版本号强制触发升级
+      console.log('[initDB] 重新打开数据库，强制创建对象存储');
+      dbInstance = await openDB(DB_NAME, DB_VERSION, (db, oldVersion, newVersion) => {
+        console.log(`[initDB] 强制升级: ${oldVersion} -> ${newVersion}`);
+        
+        // 确保创建链接对象存储
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          console.log(`[initDB] 创建对象存储: ${STORE_NAME}`);
+          const store = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+          store.createIndex('url', 'url', { unique: true });
+          store.createIndex('timestamp', 'timestamp');
+        }
+        
+        // 确保创建设置对象存储
+        if (!db.objectStoreNames.contains('settings')) {
+          console.log('[initDB] 创建对象存储: settings');
+          db.createObjectStore('settings', { keyPath: 'key' });
+        }
+        
+        console.log(`[initDB] 强制升级完成，当前对象存储: ${Array.from(db.objectStoreNames).join(', ')}`);
+      });
+      
+      console.log('[initDB] 数据库重建成功，版本:', dbInstance.version);
+      console.log('[initDB] 对象存储:', Array.from(dbInstance.objectStoreNames).join(', '));
+    }
+    
     return dbInstance;
   } catch (error) {
     console.error('[initDB] 数据库初始化失败:', error);

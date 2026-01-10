@@ -447,6 +447,63 @@
       display: none; /* 始终默认隐藏 */
     }
     
+    /* 快捷键配置提示 */
+    .shortcut-tip {
+      background-color: #e3f2fd;
+      border-top: 1px solid #90caf9;
+      padding: 10px;
+      margin-top: 0;
+    }
+    
+    .shortcut-tip-content {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    
+    .shortcut-tip-content p {
+      margin: 0;
+      font-size: 13px;
+      color: #1976d2;
+      flex: 1;
+      min-width: 200px;
+    }
+    
+    .shortcut-tip-content strong {
+      color: #0d47a1;
+    }
+    
+    .shortcut-config-btn,
+    .shortcut-dismiss-btn {
+      padding: 6px 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    
+    .shortcut-config-btn {
+      background-color: #2196F3;
+      color: white;
+    }
+    
+    .shortcut-config-btn:hover {
+      background-color: #1976d2;
+    }
+    
+    .shortcut-dismiss-btn {
+      background-color: transparent;
+      color: #666;
+      text-decoration: underline;
+    }
+    
+    .shortcut-dismiss-btn:hover {
+      color: #333;
+    }
+    
     /* 搜索框样式 */
     .search-container {
       padding: 10px;
@@ -598,6 +655,14 @@
     <button id="importJsonBtn">导入</button>
     <button id="exportBtn">导出</button>
     <button id="settingsBtn">设置</button>
+  </div>
+  <!-- 快捷键配置提示 -->
+  <div id="shortcutTip" class="shortcut-tip" style="display: none;">
+    <div class="shortcut-tip-content">
+      <p>💡 提示：配置快捷键后，按 <strong>Shift+Alt+S</strong> 即可快速保存当前页面</p>
+      <button id="configureShortcutBtn" class="shortcut-config-btn">配置快捷键</button>
+      <button id="dismissShortcutTipBtn" class="shortcut-dismiss-btn">不再提示</button>
+    </div>
   </div>
   <!-- 隐藏的文件输入，用于导入 JSON -->
   <input type="file" id="jsonFileInput" accept=".json" style="display: none;">
