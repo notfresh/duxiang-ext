@@ -27,7 +27,7 @@
         "suggested_key": {
           "default": "Shift+Alt+S"
         },
-        "description": "显示保存的阅读内容"
+        "description": "收藏当前Tab网址"
       }
     },
     "icons": {
