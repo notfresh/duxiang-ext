@@ -61,10 +61,42 @@ export function formatDate(timestamp) {
  * @param {string} tagsString - 标签字符串（逗号分隔）
  * @returns {string[]} 标签数组
  */
-export function parseTags(tagsString) {
-  if (!tagsString || tagsString.trim() === '') {
-    return [];
+/**
+ * 解析标签字符串为数组（支持英文逗号和中文逗号）
+ * @param {string|Array} tags - 标签字符串或数组
+ * @returns {Array<string>} 标签数组
+ */
+export function parseTags(tags) {
+  // 如果已经是数组，直接返回
+  if (Array.isArray(tags)) {
+    return tags.map(t => String(t).trim()).filter(t => t);
   }
-  return tagsString.split(',').map(t => t.trim()).filter(t => t);
+  
+  // 如果是字符串，解析它
+  if (typeof tags === 'string') {
+    const tagsString = tags.trim();
+    if (!tagsString) {
+      return [];
+    }
+    // 支持英文逗号和中文逗号分隔
+    return tagsString.split(/[,，]/).map(t => t.trim()).filter(t => t);
+  }
+  
+  return [];
+}
+
+/**
+ * 将标签数组转换为字符串（用于存储）
+ * @param {Array<string>|string} tags - 标签数组或字符串
+ * @returns {string} 逗号分隔的标签字符串
+ */
+export function tagsArrayToString(tags) {
+  if (Array.isArray(tags)) {
+    return tags.map(t => String(t).trim()).filter(t => t).join(',');
+  }
+  if (typeof tags === 'string') {
+    return tags.trim();
+  }
+  return '';
 }
 

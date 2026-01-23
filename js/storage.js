@@ -4,6 +4,7 @@
  */
 
 import { openDB, getStore, add, get, getAll, put, del, deleteDB } from './idb.js';
+import { parseTags, tagsArrayToString } from './utils.js';
 
 const DB_NAME = 'readingLinks';
 const DB_VERSION = 2; // 使用版本 2，避免升级阻塞问题
@@ -255,7 +256,7 @@ export async function loadLinks() {
         id: link.id,
         title: (link.title || '').trim(),
         url: link.url.trim(),
-        tags: (link.tags || '').trim(),
+        tags: parseTags(link.tags), // 导出时转换为数组格式
         timestamp: link.timestamp || new Date().toISOString(),
         pinned: link.pinned || false
       });
@@ -297,7 +298,7 @@ export async function addLink(link) {
     const linkData = {
       title: link.title || '',
       url: link.url || '',
-      tags: link.tags || '',
+      tags: tagsArrayToString(link.tags), // 存储时转换为字符串格式
       timestamp: link.timestamp || new Date().toISOString()
     };
     
@@ -348,8 +349,12 @@ export async function updateLink(id, updates) {
       throw new Error('链接不存在');
     }
     
-    // 合并更新
-    const updated = { ...existing, ...updates, id };
+    // 合并更新，如果 updates 中有 tags，需要转换为字符串格式
+    const processedUpdates = { ...updates };
+    if ('tags' in processedUpdates) {
+      processedUpdates.tags = tagsArrayToString(processedUpdates.tags);
+    }
+    const updated = { ...existing, ...processedUpdates, id };
     await put(store, updated);
   } catch (error) {
     if (error.name === 'ConstraintError') {
@@ -453,7 +458,7 @@ export async function batchAddLinks(links) {
         const linkData = {
           title: (link.title || '').trim() || '无标题',
           url: url,
-          tags: (link.tags || '').trim(),
+          tags: tagsArrayToString(link.tags), // 兼容数组和字符串格式（包括中文逗号）
           timestamp: link.timestamp || new Date().toISOString()
         };
         

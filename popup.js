@@ -1,7 +1,7 @@
 // 导入模块
-import { showStatus, log } from './js/utils.js';
+import { showStatus, log, tagsArrayToString } from './js/utils.js';
 import { renderLinks, showEmptyState, showSearchEmptyState } from './js/render.js';
-import { loadLinks, deleteLink as deleteLinkFromStorage, updateLink, exportLinks, batchAddLinks, togglePinLink, clearDatabase as clearDatabaseFromStorage } from './js/storage.js';
+import { loadLinks, deleteLink as deleteLinkFromStorage, updateLink, exportLinks, batchAddLinks, togglePinLink, clearDatabase as clearDatabaseFromStorage, addLink } from './js/storage.js';
 import { importBookmarks } from './js/bookmarks.js';
 import { setupSearch } from './js/search.js';
 import { loadSettings, saveSettings, updateCompactModeSettings } from './js/settings.js';
@@ -230,7 +230,8 @@ document.addEventListener('DOMContentLoaded', function() {
       editDialogTitle.textContent = '编辑链接';
       editTitleInput.value = link.title || '';
       editUrlInput.value = link.url || '';
-      editTagsInput.value = link.tags || '';
+      // tags 可能是数组格式，需要转换为字符串显示
+      editTagsInput.value = tagsArrayToString(link.tags) || '';
     } else {
       // 新增模式
       editDialogTitle.textContent = '新增链接';

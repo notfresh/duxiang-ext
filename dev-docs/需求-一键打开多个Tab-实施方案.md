@@ -155,3 +155,5 @@ if (newVersion >= 3 && !db.objectStoreNames.contains('tabGroups')) {
 4. 集合模板功能
 
 
+
+
