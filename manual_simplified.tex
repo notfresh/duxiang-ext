@@ -1,0 +1,306 @@
+% !TEX program = xelatex
+\documentclass[10pt,a4paper]{article}
+\usepackage[UTF8]{ctex}
+\usepackage{fontspec}
+\usepackage{enumitem}
+\usepackage{geometry}
+\usepackage{titlesec}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{setspace}
+\usepackage{array}
+\usepackage{parskip}
+
+% ===== 字体设置 =====
+\setmainfont{Times New Roman}
+\setCJKmainfont{SimSun}[AutoFakeBold=true]
+\setCJKsansfont{Microsoft YaHei}
+
+% ===== 页面布局 =====
+\geometry{left=1.5cm, right=1.5cm, top=1.5cm, bottom=1.5cm}
+
+% ===== 标题格式 =====
+\titleformat{\section}{\large\bfseries\color{black}}{}{0em}{}[\vspace{3pt} \hrule height 0.6pt \vspace{3pt}]
+\titleformat{\subsection}{\normalsize\bfseries}{}{0em}{}[\vspace{1pt}]
+
+\titlespacing*{\section}{0pt}{10pt}{5pt}
+\titlespacing*{\subsection}{0pt}{8pt}{3pt}
+
+% ===== 列表样式 =====
+\setlist[itemize]{
+  left=10pt,
+  nosep,
+  before=\vspace{0pt},
+  after=\vspace{2pt},
+  itemsep=3pt,
+  label=\textbullet
+}
+
+% ===== 超链接 =====
+\hypersetup{
+  colorlinks=true,
+  urlcolor=blue,
+  linkcolor=black
+}
+
+% ===== 全局样式 =====
+\pagestyle{empty}
+\setstretch{1.15}
+\renewcommand{\arraystretch}{1.0}
+
+% ===== 自定义命令 =====
+\newcommand{\stepitem}[2]{%
+  \item \textbf{#1}：#2
+}
+
+% ===== 开始文档 =====
+\begin{document}
+
+% ===== 标题 =====
+\begin{center}
+{\Large\bfseries Reading Share Chrome Extension}\\
+\vspace{2pt}
+{\large 操作说明书}\\
+\vspace{3pt}
+\textit{版本 1.0}
+\end{center}
+
+\vspace{10pt}
+
+% ===== 软件说明书（用于软著登记） =====
+\section*{软件说明书}
+
+\subsection*{一、软件的功能描述}
+
+Reading Share Chrome Extension（阅读分享Chromium内核浏览器扩展）是一款为Google Chrome/ Microsoft Edge浏览器设计的网页内容管理工具。本软件通过在浏览器工具栏集成快速收藏功能，帮助用户高效地收集、存储、管理和检索网络上发现的有价值内容。
+
+\subsubsection*{主要功能模块}
+
+\textbf{1. 网页收藏模块}：一键收藏网页信息、编辑和删除收藏、添加备注和标签。
+
+\textbf{2. 搜索与过滤模块}：实时关键词搜索、多字段搜索、智能模糊匹配、搜索结果展示。
+
+\textbf{3. 数据导入导出模块}：从Chrome浏览器导入书签、从HTML文件导入、导出为JSON/HTML格式、重复项目检测处理。
+
+\textbf{4. 数据管理模块}：IndexedDB本地存储、数据永久保存、隐私保护、数据导出备份、数据清除功能。
+
+\textbf{5. 用户界面与交互模块}：浏览器弹出窗口UI、列表视图和紧凑视图、浅色和深色主题、虚拟滚动渲染。
+
+\textbf{6. 性能优化模块}：虚拟滚动技术、自动加载、内存管理优化、搜索性能优化。
+
+\subsection*{二、主要技术特点}
+
+\textbf{1. 架构特点}：模块化设计、Chrome后台脚本、轻量级弹出窗口UI、网页内容脚本集成。
+
+\textbf{2. 数据存储技术}：IndexedDB API数据库、Promise和async/await异步操作、事务管理、多索引优化、50MB+大容量存储。
+
+\textbf{3. 搜索算法}：全文搜索实现、中英文智能分词、编辑距离模糊匹配、多字段检索、实时索引维护。
+
+\textbf{4. 性能优化技术}：虚拟滚动（Virtual Scrolling）、懒加载和渐进式加载、内存泄漏防止、搜索结果缓存、事件委托优化、防抖节流。
+
+\textbf{5. 用户界面技术}：CSS Media Queries响应式设计、动态主题切换、原生JavaScript DOM操作、CSS变量主题定制。
+
+\textbf{6. 数据处理技术}：JSON序列化反序列化、HTML书签文件解析、网页元数据提取、UTF-8字符编码处理、File API文件操作。
+
+\textbf{7. 安全特点}：本地隐私保护、权限最小化、内容安全策略（CSP）、数据隔离。
+
+\textbf{8. 兼容性与可靠性}：Chrome 90+支持、Windows/macOS/Linux多系统、完善错误处理、大规模数据稳定性。
+
+\vspace{10pt}
+
+% ===== 1. 简介 =====
+\section{简介}
+
+Reading Share 是一款为Chrome浏览器设计的网页内容管理工具。用户可以快速保存、整理和搜索网络上发现的有价值内容。
+
+\subsection{主要特点}
+\begin{itemize}
+  \item 一键收藏当前网页的完整信息
+  \item 强大的全文搜索功能和智能过滤
+  \item 支持从浏览器书签批量导入
+  \item 所有数据存储在本地，无需云端同步
+  \item 支持数据导入导出，便于多设备使用
+  \item 隐私保护，数据完全本地化
+\end{itemize}
+
+\vspace{5pt}
+
+% ===== 2. 安装与启用 =====
+\section{安装与启用}
+
+\subsection{系统要求}
+\begin{itemize}
+  \item Chrome 浏览器版本 90 或更高
+  \item 操作系统：Windows、macOS、Linux
+  \item 磁盘空间：最少 10 MB
+\end{itemize}
+
+\subsection{安装步骤}
+\begin{enumerate}
+  \item 打开 Chrome 地址栏输入 \texttt{chrome://extensions}
+  \item 启用右上角的"开发者模式"
+  \item 点击"加载已解压的扩展程序"
+  \item 选择项目文件夹完成安装
+  \item Chrome 工具栏会显示扩展图标
+\end{enumerate}
+
+\vspace{5pt}
+
+% ===== 3. 使用说明 =====
+\section{使用说明}
+
+\subsection{一键收藏}
+\begin{enumerate}
+  \item 访问要收藏的网页
+  \item 点击 Chrome 工具栏上的 Reading Share 扩展图标
+  \item 扩展自动获取网页标题、URL、时间戳等信息
+  \item 点击确认完成收藏
+\end{enumerate}
+
+\subsection{管理收藏}
+\begin{itemize}
+  \item \textbf{编辑}：在列表中点击编辑按钮修改标题、URL、备注等
+  \item \textbf{删除}：点击删除按钮移除不需要的收藏
+  \item \textbf{查看}：打开扩展弹窗查看所有已收藏内容
+\end{itemize}
+
+\subsection{搜索功能}
+\begin{enumerate}
+  \item 打开扩展弹窗，搜索框位于顶部
+  \item 输入关键词，实时显示匹配结果
+  \item 支持标题、URL、备注等多字段搜索
+  \item 点击清空按钮恢复显示所有内容
+\end{enumerate}
+
+\subsection{导入数据}
+\begin{enumerate}
+  \item 打开设置面板（齿轮图标）
+  \item 选择"导入 Chrome 收藏"或"从文件导入"
+  \item 选择要导入的书签或HTML文件
+  \item 确认导入，完成后会显示导入数量
+\end{enumerate}
+
+\subsection{导出和备份}
+\begin{enumerate}
+  \item 打开设置面板
+  \item 点击"导出数据"按钮
+  \item 选择导出格式（JSON 或 HTML）
+  \item 下载备份文件到本地
+  \item 可将备份保存到云存储（Google Drive、OneDrive等）
+\end{enumerate}
+
+\subsection{设置选项}
+\begin{itemize}
+  \item \textbf{主题}：选择浅色或深色主题
+  \item \textbf{显示模式}：标准模式或紧凑模式
+  \item \textbf{数据导入}：从备份文件恢复数据
+  \item \textbf{数据清除}：永久删除所有收藏数据（需确认）
+\end{itemize}
+
+\vspace{5pt}
+
+% ===== 4. 数据管理 =====
+\section{数据管理}
+
+\subsection{存储方式}
+\begin{itemize}
+  \item 使用Chrome提供的IndexedDB本地数据库
+  \item 所有数据存储在计算机本地，不上传云端
+  \item 数据不受浏览器缓存清理影响
+  \item Windows路径：\texttt{AppData\textbackslash Local\textbackslash Google\textbackslash Chrome\textbackslash User Data}
+\end{itemize}
+
+\subsection{数据安全}
+\begin{itemize}
+  \item 完全本地存储，无第三方服务器访问
+  \item 仅Chrome浏览器可访问数据
+  \item 删除收藏后无法恢复，建议定期备份
+  \item 卸载扩展前必须导出数据
+\end{itemize}
+
+\subsection{多设备同步}
+\begin{enumerate}
+  \item 设备A导出数据为JSON格式
+  \item 保存到云存储（Google Drive、Dropbox等）
+  \item 在设备B安装扩展
+  \item 打开设置，选择导入数据
+  \item 选择云存储中的文件完成同步
+\end{enumerate}
+
+\vspace{5pt}
+
+% ===== 5. 常见问题 =====
+\section{常见问题}
+
+\subsection{Q：如何清空所有数据？}
+打开设置 > 找到"清空所有数据" > 二次确认即可永久删除。
+
+\subsection{Q：数据会自动备份吗？}
+不会。需要手动导出数据进行备份，建议每月至少备份一次。
+
+\subsection{Q：能在其他浏览器使用吗？}
+目前仅支持Chrome浏览器。其他浏览器可通过导入导出文件转移收藏。
+
+\subsection{Q：搜索功能支持哪些操作？}
+支持关键词搜索、多字段搜索、模糊匹配，输入时实时显示结果。
+
+\subsection{Q：导入失败怎么办？}
+确认文件格式正确（HTML或标准书签格式）、编码为UTF-8、文件未损坏。
+
+\subsection{Q：收藏数量很多时是否会卡顿？}
+采用虚拟滚动技术，即使数万条收藏也能保持流畅性能。
+
+\vspace{5pt}
+
+% ===== 6. 技术支持 =====
+\section{技术支持}
+
+\subsection{获取帮助}
+\begin{itemize}
+  \item 查看项目GitHub仓库中的README文件
+  \item 检查dev-docs文件夹中的文档
+  \item 在GitHub Issues提交问题或建议
+\end{itemize}
+
+\subsection{报告问题}
+提交问题时请包括：
+\begin{itemize}
+  \item 问题的具体现象和复现步骤
+  \item Chrome版本和操作系统信息
+  \item 相关的截图或错误信息
+\end{itemize}
+
+\vspace{5pt}
+
+% ===== 7. 版本信息 =====
+\section{版本信息}
+
+\subsection{版本 1.0 功能}
+\begin{itemize}
+  \item 网页一键收藏
+  \item 实时关键词搜索
+  \item Chrome书签批量导入
+  \item HTML文件导入
+  \item 数据导出（JSON/HTML格式）
+  \item 两种显示模式（标准/紧凑）
+  \item 两种主题（浅色/深色）
+  \item 虚拟滚动性能优化
+\end{itemize}
+
+\subsection{已知限制}
+\begin{itemize}
+  \item 仅支持Chrome浏览器
+  \item 数据同步需手动导入导出
+  \item 跨设备同步不支持自动云同步
+\end{itemize}
+
+\vspace{10pt}
+
+% ===== 页脚 =====
+\begin{center}
+\small
+Reading Share Chrome Extension 操作说明书 | 版本 1.0\\
+最后更新：2026年2月
+\end{center}
+
+\end{document}

@@ -1,0 +1,1430 @@
+% !TEX program = xelatex
+\documentclass[10pt,a4paper]{article}
+\usepackage[UTF8]{ctex}
+\usepackage{fontspec}
+\usepackage{enumitem}
+\usepackage{geometry}
+\usepackage{titlesec}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{setspace}
+\usepackage{array}
+\usepackage{parskip}
+
+% ===== 字体设置 =====
+\setmainfont{Times New Roman}
+\setCJKmainfont{SimSun}[AutoFakeBold=true]
+\setCJKsansfont{Microsoft YaHei}
+
+% ===== 页面布局 =====
+\geometry{left=1.5cm, right=1.5cm, top=1.5cm, bottom=1.5cm}
+
+% ===== 标题格式 =====
+\titleformat{\section}{\large\bfseries\color{black}}{}{0em}{}[\vspace{3pt} \hrule height 0.6pt \vspace{3pt}]
+\titleformat{\subsection}{\normalsize\bfseries}{}{0em}{}[\vspace{1pt}]
+
+\titlespacing*{\section}{0pt}{10pt}{5pt}
+\titlespacing*{\subsection}{0pt}{8pt}{3pt}
+
+% ===== 列表样式 =====
+\setlist[itemize]{
+  left=10pt,
+  nosep,
+  before=\vspace{0pt},
+  after=\vspace{2pt},
+  itemsep=3pt,
+  label=\textbullet
+}
+
+% ===== 超链接 =====
+\hypersetup{
+  colorlinks=true,
+  urlcolor=blue,
+  linkcolor=black
+}
+
+% ===== 全局样式 =====
+\pagestyle{empty}
+\setstretch{1.15}
+\renewcommand{\arraystretch}{1.0}
+
+% ===== 自定义命令 =====
+\newcommand{\stepitem}[2]{%
+  \item \textbf{#1}：#2
+}
+
+\newcommand{\subtitle}[1]{%
+  \vspace{3pt}
+  \noindent{\textbf{#1}}
+}
+
+% ===== 开始文档 =====
+\begin{document}
+
+% ===== 标题 =====
+\begin{center}
+{\Large\bfseries Reading Share Chrome Extension}\\
+\vspace{2pt}
+{\large 操作说明书}\\
+\vspace{3pt}
+\textit{版本 1.0}
+\end{center}
+
+\vspace{10pt}
+
+% ===== 软件说明书（用于软著登记） =====
+\newpage
+\section*{软件说明书}
+
+\subsection*{一、软件的功能描述}
+
+Reading Share Chrome Extension（阅读分享Chrome扩展）是一款为Google Chrome浏览器设计的网页内容管理工具。本软件通过在浏览器工具栏集成快速收藏功能，帮助用户高效地收集、存储、管理和检索网络上发现的有价值内容。
+
+\subsubsection*{主要功能模块}
+
+\textbf{1. 网页收藏模块}
+\begin{itemize}
+  \item 一键收藏当前浏览网页的完整信息（标题、URL、收藏时间等）
+  \item 自动提取网页元数据（网页标题、Meta描述、网站图标等）
+  \item 支持编辑和更新已收藏项目的信息
+  \item 支持批量删除收藏内容
+  \item 为每个收藏项目添加备注和标签
+\end{itemize}
+
+\textbf{2. 内容搜索与过滤模块}
+\begin{itemize}
+  \item 实时关键词搜索功能，支持多字段搜索（标题、URL、备注等）
+  \item 智能模糊匹配算法，支持中英文搜索
+  \item 搜索结果实时更新和高亮显示
+  \item 支持多条件组合搜索
+  \item 搜索结果统计和展示
+\end{itemize}
+
+\textbf{3. 数据导入导出模块}
+\begin{itemize}
+  \item 从Chrome浏览器书签导入收藏
+  \item 从HTML标准书签格式文件导入
+  \item 导出收藏数据为JSON格式（用于数据分析和备份）
+  \item 导出收藏数据为HTML格式（用于浏览器兼容和分享）
+  \item 支持重复项目检测和处理
+\end{itemize}
+
+\textbf{4. 数据管理模块}
+\begin{itemize}
+  \item 本地IndexedDB数据库存储管理
+  \item 数据永久保存（不受浏览器缓存清理影响）
+  \item 数据隐私保护（所有数据存储在本地）
+  \item 支持完整的数据导出备份
+  \item 支持清空所有数据的操作
+\end{itemize}
+
+\textbf{5. 用户界面与交互模块}
+\begin{itemize}
+  \item 浏览器弹出窗口UI设计
+  \item 列表视图和紧凑视图两种显示模式
+  \item 浅色和深色主题支持
+  \item 响应式设计，适应不同屏幕尺寸
+  \item 虚拟滚动实现，支持大数据集高效渲染
+\end{itemize}
+
+\textbf{6. 性能优化模块}
+\begin{itemize}
+  \item 虚拟滚动技术实现高效的列表渲染
+  \item 自动加载功能，支持渐进式加载大量数据
+  \item 内存管理优化，确保长时间运行稳定性
+  \item 搜索性能优化，支持快速全文检索
+\end{itemize}
+
+\subsection*{二、主要技术特点}
+
+\subsubsection*{1. 架构特点}
+\begin{itemize}
+  \item \textbf{模块化架构}：采用模块化设计模式，将功能分为收藏、搜索、导入导出、存储等独立模块
+  \item \textbf{后台脚本}：使用Chrome扩展后台脚本(background script)处理后台任务和事件监听
+  \item \textbf{弹出窗口UI}：使用popup机制提供轻量级用户界面
+  \item \textbf{内容脚本}：支持在网页上下文中运行脚本，提取网页信息
+\end{itemize}
+
+\subsubsection*{2. 数据存储技术}
+\begin{itemize}
+  \item \textbf{IndexedDB}：采用浏览器原生的IndexedDB API作为本地数据库
+  \item \textbf{异步操作}：使用Promise和async/await实现异步数据库操作
+  \item \textbf{事务管理}：支持数据库事务保证数据一致性
+  \item \textbf{索引优化}：建立多个数据索引加快查询速度
+  \item \textbf{增量存储}：支持大规模数据存储，最大可利用浏览器配额（通常50MB以上）
+\end{itemize}
+
+\subsubsection*{3. 搜索算法}
+\begin{itemize}
+  \item \textbf{全文搜索}：实现基于正则表达式和字符串匹配的全文搜索
+  \item \textbf{智能分词}：支持中英文混合搜索和分词处理
+  \item \textbf{模糊匹配}：采用编辑距离算法实现容错搜索
+  \item \textbf{多字段检索}：支持在标题、URL、备注等多个字段同时搜索
+  \item \textbf{实时索引}：维护搜索索引保证快速响应
+\end{itemize}
+
+\subsubsection*{4. 性能优化技术}
+\begin{itemize}
+  \item \textbf{虚拟滚动}：实现虚拟滚动（Virtual Scrolling）技术，只渲染可见区域的DOM元素
+  \item \textbf{懒加载}：实现数据的懒加载和渐进式加载
+  \item \textbf{内存管理}：优化JavaScript对象生命周期，防止内存泄漏
+  \item \textbf{缓存机制}：实现搜索结果缓存减少重复查询
+  \item \textbf{事件委托}：使用事件委托减少事件监听数量
+  \item \textbf{防抖和节流}：在搜索和滚动等高频事件中使用防抖/节流
+\end{itemize}
+
+\subsubsection*{5. 用户界面技术}
+\begin{itemize}
+  \item \textbf{响应式设计}：使用CSS Media Queries实现响应式布局
+  \item \textbf{主题系统}：实现动态主题切换，支持浅色和深色模式
+  \item \textbf{DOM操作}：使用原生JavaScript进行高效的DOM操作
+  \item \textbf{样式预处理}：使用CSS变量实现主题定制
+\end{itemize}
+
+\subsubsection*{6. 数据处理技术}
+\begin{itemize}
+  \item \textbf{JSON处理}：支持JSON序列化和反序列化
+  \item \textbf{HTML解析}：实现HTML书签文件的解析和转换
+  \item \textbf{元数据提取}：从网页HTML中提取meta标签等元数据
+  \item \textbf{字符编码}：正确处理UTF-8及其他字符编码
+  \item \textbf{文件导入导出}：使用File API实现浏览器级别的文件操作
+\end{itemize}
+
+\subsubsection*{7. 安全特点}
+\begin{itemize}
+  \item \textbf{隐私保护}：所有数据存储在本地，不经过任何远程服务器
+  \item \textbf{权限最小化}：仅请求必要的Chrome扩展权限
+  \item \textbf{内容安全}：实现内容安全策略(CSP)防止XSS攻击
+  \item \textbf{数据隔离}：扩展数据与其他应用数据完全隔离
+\end{itemize}
+
+\subsubsection*{8. 兼容性与可靠性}
+\begin{itemize}
+  \item \textbf{浏览器兼容}：支持Chrome 90+版本
+  \item \textbf{多系统支持}：兼容Windows、macOS、Linux等操作系统
+  \item \textbf{错误处理}：完善的错误捕获和异常处理机制
+  \item \textbf{可靠性}：支持大规模数据存储和检索的稳定性测试
+\end{itemize}
+
+\vspace{10pt}
+
+% ===== 1. 简介 =====
+\section{简介}
+
+Reading Share 是一款为Chrome浏览器设计的生产力工具，帮助用户高效管理和分享阅读内容。无论您是研究员、学生、内容创作者还是普通网络用户，都可以使用本扩展快速保存、整理和搜索您在网络上发现的有价值的内容。
+
+\subsection{主要特点}
+\begin{itemize}
+  \item \textbf{一键收藏}：在任何网页上快速保存链接、标题和元数据
+  \item \textbf{智能搜索}：强大的全文搜索功能，快速定位已收藏的内容
+  \item \textbf{批量导入}：支持从浏览器收藏夹导入大量书签数据
+  \item \textbf{离线访问}：所有数据存储在本地，无需网络连接即可查看
+  \item \textbf{数据同步}：通过导入导出功能实现多设备数据同步
+  \item \textbf{隐私保护}：数据完全存储在本地，不上传到任何远程服务器
+\end{itemize}
+
+\subsection{适用人群}
+\begin{itemize}
+  \item \textbf{学生和研究人员}：收集研究资料、论文和参考文献
+  \item \textbf{内容创作者}：管理灵感素材、参考资料和创意源
+  \item \textbf{知识工作者}：整理行业新闻、技术文章和最佳实践
+  \item \textbf{普通用户}：保存感兴趣的网页、购物链接和重要信息
+\end{itemize}
+
+\vspace{5pt}
+
+% ===== 2. 安装与启用 =====
+\section{安装与启用}
+
+\subsection{系统要求}
+\begin{itemize}
+  \item Chrome 浏览器版本 90 或更高
+  \item 操作系统：Windows、macOS、Linux
+  \item 磁盘空间：最少 10 MB
+  \item 网络：仅用于导入收藏夹功能（可选）
+\end{itemize}
+
+\subsection{开发者模式安装（开发版）}
+\begin{itemize}
+  \stepitem{打开扩展管理页面}{%
+    \begin{enumerate}
+      \item 在 Chrome 地址栏输入 \texttt{chrome://extensions}
+      \item 按 Enter 键访问扩展管理页面
+      \item 或点击 Chrome 菜单 > 更多工具 > 扩展程序
+    \end{enumerate}
+  }
+  \stepitem{启用开发者模式}{%
+    \begin{enumerate}
+      \item 找到页面右上角的"开发者模式"开关
+      \item 点击开关启用开发者模式（开关变为蓝色）
+      \item 此时页面会显示新的功能按钮：加载已解压的扩展程序、打包扩展程序等
+    \end{enumerate}
+  }
+  \stepitem{加载扩展程序}{%
+    \begin{enumerate}
+      \item 点击"加载已解压的扩展程序"按钮
+      \item 在弹出的文件选择对话框中，导航到项目根目录
+      \item 选择项目文件夹（包含 manifest.json 的文件夹）
+      \item 点击"选择文件夹"完成安装
+    \end{enumerate}
+  }
+  \stepitem{验证安装}{%
+    \begin{enumerate}
+      \item 扩展管理页面会显示 "Reading Share Chrome Extension" 条目
+      \item 条目显示为"启用"状态（有蓝色的启用开关）
+      \item Chrome 工具栏右侧会出现 Reading Share 扩展图标
+      \item 如未看到图标，点击 Chrome 工具栏右侧的扩展程序图标按钮，查找 Reading Share 并钉选到工具栏
+    \end{enumerate}
+  }
+\end{itemize}
+
+\subsection{卸载与重新安装}
+\begin{itemize}
+  \stepitem{临时禁用}{%
+    在扩展管理页面中，关闭 Reading Share 条目右侧的蓝色启用开关，扩展会被禁用但不会删除数据
+  }
+  \stepitem{完全卸载}{%
+    \begin{enumerate}
+      \item 在扩展管理页面找到 Reading Share 条目
+      \item 点击右下方的"删除"按钮
+      \item 在确认对话框中再次点击"删除"
+      \item \textit{警告：卸载前请导出数据，否则所有本地数据将被删除}
+    \end{enumerate}
+  }
+  \stepitem{重新安装}{%
+    如需重新安装，删除后按照上述步骤重新加载扩展程序即可
+  }
+\end{itemize}
+
+\vspace{5pt}
+
+% ===== 3. 快速开始 =====
+\section{快速开始}
+
+\subsection{首次使用步骤}
+\begin{itemize}
+  \stepitem{打开扩展弹窗}{%
+    \begin{enumerate}
+      \item 在 Chrome 工具栏找到 Reading Share 扩展图标（通常是书签或阅读相关的图标）
+      \item 点击图标打开扩展的弹出窗口
+      \item 弹出窗口会显示扩展的主界面
+    \end{enumerate}
+  }
+  \stepitem{了解界面布局}{%
+    第一次打开时，如果您还没有收藏任何内容，界面会显示一个欢迎提示和引导说明
+  }
+  \stepitem{收藏第一个网页}{%
+    \begin{enumerate}
+      \item 访问任何您喜欢的网站或网页
+      \item 点击工具栏上的 Reading Share 扩展图标
+      \item 当前网页的标题、URL 和其他信息会被自动收集
+      \item 点击确认或提交按钮完成收藏
+      \item 系统会显示"收藏成功"的提示消息
+    \end{enumerate}
+  }
+\end{itemize}
+
+\subsection{主要界面区域详解}
+
+\subtitle{上方一键收藏网页}
+
+\subtitle{基本收藏流程}
+\begin{enumerate}
+  \item \textbf{打开网页}：在 Chrome 中访问您想要收藏的网页
+  \item \textbf{点击扩展图标}：点击 Chrome 工具栏上的 Reading Share 扩展图标
+  \item \textbf{自动获取信息}：扩展会自动获取当前网页的以下信息：
+    \begin{itemize}
+      \item 网页标题（Page Title）
+      \item 网页 URL（完整网址）
+      \item 网页描述（如有 Meta Description 标签）
+      \item 网页图标（Favicon）
+      \item 当前时间（作为收藏时间戳）
+    \end{itemize}
+  \item \textbf{确认收藏}：检查自动填充的信息是否正确，点击确认或提交按钮
+  \item \textbf{成功提示}：界面会显示"已添加到阅读收藏"或类似的成功提示消息
+  \item \textbf{可选操作}：成功后可选择：
+    \begin{itemize}
+      \item 继续收藏其他网页
+      \item 关闭扩展弹窗返回网页
+      \item 打开收藏列表查看刚收藏的内容
+    \end{itemize}
+\end{enumerate}
+
+\subtitle{编辑收藏信息}
+\begin{itemize}
+  \stepitem{打开收藏列表}{%
+    点击工具栏的扩展图标打开弹出窗口
+  }
+  \stepitem{找到要编辑的项目}{%
+    在列表中滚动查找或使用搜索功能定位要编辑的网页
+  }
+  \stepitem{点击编辑按钮}{%
+    在列表项的右侧找到编辑按钮（通常是铅笔图标）并点击
+  }
+  \stepitem{修改信息}{%
+    \begin{itemize}
+      \item 修改网页标题：更改显示名称，便于识别
+      \item 修改网址：如果 URL 有误，手动输入正确的网址
+      \item 添加备注：在备注字段添加个人笔记或描述
+      \item 修改标签：为这个收藏添加分类标签（如"技术"、"阅读"等）
+    \end{itemize}
+  }
+  \stepitem{保存修改}{%
+    点击保存或确认按钮，修改会立即生效
+  }
+\end{itemize}
+
+\subtitle{删除收藏}
+\begin{itemize}
+  \item \textbf{单个删除}：
+    \begin{enumerate}
+      \item 在收藏列表中找到要删除的项目
+      \item 点击该项目右侧的删除按钮（通常是垃圾桶图标）
+      \item 系统会弹出确认对话框：``确定要删除此项目吗?''
+      \item 点击确认即可删除，删除后无法撤销
+    \end{enumerate}
+  \item \textbf{批量删除}：
+    \begin{enumerate}
+      \item 在设置中可能提供清空所有数据的选项
+      \item 点击"清空所有数据"按钮
+      \item 系统会要求二次确认，输入 \texttt{DELETE} 或点击确认
+      \item 所有收藏数据会被永久删除（建议先备份数据）
+    \end{enumerate}
+\end{itemize}
+
+\subsection{强大的搜索功能}
+
+\subtitle{基本搜索}
+\begin{itemize}
+  \stepitem{打开搜索框}{%
+    打开扩展弹出窗口，搜索框位于顶部
+  }
+  \stepitem{输入关键词}{%
+    在搜索框中输入您要查找的关键词
+  }
+  \stepitem{实时搜索}{%
+    \begin{itemize}
+      \item 大多数情况下，搜索是实时进行的
+      \item 无需按 Enter 键，输入时已显示匹配结果
+      \item 列表会自动过滤，仅显示匹配的项目
+    \end{itemize}
+  }
+  \stepitem{查看结果}{%
+    搜索结果在列表中高亮显示，点击任何结果可打开链接
+  }
+  \stepitem{清空搜索}{%
+    点击搜索框右侧的清空按钮（X 图标）可清空搜索词，恢复显示所有内容
+  }
+
+\subtitle{方法一：通过弹出窗口}
+\begin{enumerate}
+  \item 点击 Chrome 工具栏上的 Reading Share 扩展图标
+  \item 打开扩展弹出窗口
+  \item 点击窗口右上角的设置按钮（齿轮图标）
+  \item 打开设置面板或选项页面
+\end{enumerate}
+
+\subtitle{方法二：通过扩展管理页面}
+\begin{enumerate}
+  \item 打开 Chrome 扩展管理页面：\texttt{chrome://extensions}
+  \item 找到 Reading Share 条目
+  \item 点击"详情"或在条目下方找到"选项"链接
+  \item 打开完整的设置页面
+\end{enumerate}
+
+\subtitle{方法三：右键菜单}
+\begin{enumerate}
+  \item 在 Chrome 工具栏上右键点击 Reading Share 扩展图标
+  \item 在弹出的上下文菜单中选择"选项"
+  \item 打开设置页面
+\end{enumerate}
+与隐私 =====
+\section{数据管理与隐私}
+
+\subsection{数据存储位置与方式}
+
+\subtitle{本地存储}
+\begin{itemize}
+  \item \textbf{存储技术}：使用 Chrome 提供的 IndexedDB（浏览器本地数据库）
+  \item \textbf{存储位置}：所有数据存储在您的计算机本地
+  \item \textbf{存储位置详情}：
+    \begin{itemize}
+      \item Windows：\texttt{C:\textbackslash Users\textbackslash [用户名]\textbackslash AppData\textbackslash Local\textbackslash Google\textbackslash Chrome\textbackslash User Data\textbackslash Default\textbackslash IndexedDB}
+      \item macOS：\texttt{\textasciitilde/Library/Application Support/Google/Chrome/Default/IndexedDB}
+      \item Linux：\texttt{\textasciitilde/.config/google-chrome/Default/IndexedDB}
+    \end{itemize}
+  \item \textbf{访问权限}：仅有您的 Chrome 浏览器可访问这些数据
+\end{itemize}
+
+\subtitle{数据安全}
+\begin{itemize}
+  \item \textbf{不上传云端}：数据不会上传到 Reading Share 服务器或任何第三方服务
+  \item \textbf{离线可用}：即使断网也可查看所有已收藏的内容
+  \item \textbf{加密存储}：在某些系统上，浏览器会对本地存储进行加密
+\end{itemize}
+
+\subsection{数据持久化与删除}
+
+\subtitle{何时数据会被保留}
+\begin{itemize}
+  \item 收藏后，数据会自动保存在本地数据库中
+  \item 即使关闭浏览器或重启计算机，数据不会丢失
+  \item 可以无限期保留数据（只要硬盘有空间）
+\end{itemize}
+
+\subtitle{何时数据会被删除}
+\begin{itemize}
+  \item \textbf{手动删除}：通过扩展界面删除单个项目
+  \item \textbf{清空所有}：通过设置清空所有收藏数据
+  \item \textbf{卸载扩展}：卸载扩展会删除相关的本地存储数据
+  \item \textbf{清除浏览器缓存}：如果在清除浏览数据时选中"扩展程序"选项
+  \item \textbf{重置 Chrome}：重置 Chrome 浏览器会删除所有扩展数据
+\end{itemize}
+
+\subtitle{清除浏览器缓存时的注意事项}
+\begin{enumerate}
+  \item 打开 Chrome 菜单 > 更多工具 > 清除浏览数据
+  \item 或按 Ctrl+Shift+Delete（Windows）/ Cmd+Shift+Delete（Mac）
+  \item 在打开的对话框中，确保 \textbf{不勾选} "扩展程序"复选框
+  \item 否则 Reading Share 的所有数据会被清除
+  \item 建议在清除前导出数据备份
+\end{enumerate}
+
+\subsection{数据备份与恢复策略}
+
+\subtitle{定期备份计划}
+\begin{itemize}
+  \item \textbf{建议频率}：每月至少备份一次重要数据
+  \item \textbf{特殊情况}：在进行浏览器大更新或卸载前必须备份
+  \item \textbf{重要数据}：对价值较高的收藏建议备份多份副本
+\end{itemize}
+
+\subtitle{多设备同步方案}
+\begin{enumerate}
+  \item \textbf{设备 A 上的导出}：
+    \begin{itemize}
+      \item 打开设置面板
+      \item 选择导出数据（推荐 JSON 格式）
+      \item 将文件保存到云存储服务（如 Google Drive、OneDrive、Dropbox 等）
+      \item 或通过邮件、U 盘等方式传输
+    \end{itemize}
+  \item \textbf{设备 B 上的导入}：
+    \begin{itemize}
+      \item 在设备 B 上安装 Reading Share 扩展
+      \item 打开设置面板
+      \item 选择导入数据
+      \item 选择从设备 A 导出的文件
+      \item 完成导入，所有收藏即可在设备 B 上使用
+    \end{itemize}
+\end{enumerate}
+
+\subsection{云服务集成建议}
+
+\subtitle{使用云存储备份}
+\begin{itemize}
+  \item \textbf{Google Drive}：
+    \begin{itemize}
+      \item 导出 JSON 文件到 Google Drive
+      \item 可在任何有网络的设备访问
+      \item 支持自动备份（手动）
+    \end{itemize}
+  \item \textbf{Microsoft OneDrive}：
+    \begin{itemize}
+      \item 导出文件到 OneDrive
+      \item 与 Windows 用户的同步更便捷
+      \item 可设置文件版本历史
+    \end{itemize}
+  \item \textbf{Dropbox}：
+    \begin{itemize}
+      \item 稳定可靠的云存储方案
+      \item 跨平台支持
+      \item 支持共享备份文件给其他用户
+    \end{itemizend{enumerate}
+
+\subsection{显示模式}
+
+\subtitle{标准模式}
+\begin{itemize}
+  \item 每个收藏项显示完整信息
+  \item 包括网页标题、URL、收藏时间、描述等
+  \item 占用较多空间，适合屏幕较大的设备
+  \item 便于详细查看每个项目的信息
+\end{itemize}
+
+\subtitle{紧凑模式}
+\begin{itemize}
+  \item 每个收藏项仅显示标题和基本信息
+  \item 一屏能显示更多项目
+  \item 适合快速浏览和查找
+  \item 节省弹出窗口空间
+\end{itemize}
+
+\subtitle{切换显示模式}
+\begin{enumerate}
+  \item 打开设置面板
+  \item 找到"显示设置"或"视图模式"选项
+  \item 在"标准"和"紧凑"之间选择
+  \item 选择后立即生效
+\end{enumerate}
+
+\subsection{数据导出与备份}
+
+\subtitle{导出为 JSON 格式}
+\begin{itemize}
+  \item \textbf{特点}：保留所有数据和元数据，便于数据分析和处理
+  \item \textbf{用途}：备份、迁移、数据分析、与其他工具集成
+  \item \textbf{文件大小}：相对较小，适合网络传输
+\end{itemize}
+
+\subtitle{导出为 HTML 格式}
+\begin{itemize}
+  \item \textbf{特点}：生成可在浏览器中打开的 HTML 书签文件
+  \item \textbf{用途}：导入到其他浏览器、分享给他人、离线查看
+  \item \textbf{优势}：可以直接导入 Chrome 或其他浏览器的书签
+\end{itemize}
+
+\subtitle{导出步骤}
+\begin{enumerate}
+  \item 打开设置面板
+  \item 找到"数据管理"或"备份"部分
+  \item 点击"导出数据"按钮
+  \item 选择导出格式（JSON 或 HTML）
+  \item 点击"导出"或"下载"
+  \item 系统会自动下载包含所有收藏数据的文件
+  \item 文件会保存到浏览器的默认下载目录
+  \item 文件名通常为 \texttt{reading-share-backup-2026-02-05.json} 或类似的格式
+\end{enumerate}
+
+\subsection{数据导入}
+与故障排查 =====
+\section{常见问题与故障排查}
+
+\subsection{安装和启用问题}
+
+\subsubsection{Q：Chrome 扩展管理页面显示"扩展程序在此设备上不被允许"}
+
+\begin{itemize}
+  \item \textbf{原因}：某些企业 Chrome 设备或受管理的计算机禁用了非官方扩展
+  \item \textbf{解决方案}：
+    \begin{enumerate}
+      \item 检查您是否在公司管理的 Chrome 帐户下
+      \item 联系 IT 管理员获取权限
+      \item 或在个人帐户下使用 Chrome
+    \end{enumerate}
+\end{itemize}
+
+\subsubsection{Q：刷新后扩展图标消失了}
+
+\begin{itemize}
+  \item \textbf{原因}：浏览器更新可能重置了扩展的固定状态
+  \item \textbf{解决方案}：
+    \begin{enumerate}
+      \item 打开 Chrome 扩展管理页面
+      \item 确认 Reading Share 仍在列表中且状态为"启用"
+      \item 点击工具栏右侧的扩展程序按钮
+      \item 找到 Reading Share 并点击右侧的固定图标，重新钉选到工具栏
+    \end{enumerate}
+\end{itemize}
+
+\subsubsection{Q：加载扩展时提示"无法加载来自该路径的扩展程序"}
+
+\begin{itemize}
+  \item \textbf{原因}：文件夹路径中可能包含特殊字符或中文字符
+  \item \textbf{解决方案}：
+    \begin{enumerate}
+      \item 将项目文件夹移到路径更简单的位置
+      \item 例如 \texttt{C:\textbackslash Projects\textbackslash reading-share-ext}
+      \item 或重命名文件夹，使用英文和数字
+      \item 重新加载扩展
+    \end{enumerate}
+\end{itemize}
+
+\subsubsection{Q：manifest.json 校验失败}
+
+\begin{itemize}
+  \item \textbf{原因}：manifest.json 文件格式错误或损坏
+  \item \textbf{解决方案}：
+    \begin{enumerate}
+      \item 用文本编辑器打开 manifest.json
+      \item 检查 JSON 格式是否正确（所有引号、逗号等）
+      \item 使用在线 JSON 验证工具检查：\url{https://jsonlint.com}
+      \item 确保没有中文字符或特殊字符
+      \item 修正格式后保存，重新加载扩展
+    \end{enumerate}
+\end{itemize}
+
+\subsection{收藏与搜索问题}
+
+\subsubsection{Q：收藏按钮无反应，无法收藏网页}
+
+\begin{itemize}
+  \item \textbf{原因可能}：
+    \begin{enumerate}
+      \item 扩展未正确加载或启用
+      \item 当前网页是特殊网页（如 Chrome 内置页面）
+      \item JavaScript 被禁用
+      \item 浏览器缓存问题
+    \end{enumerate}
+  \item \textbf{解决方案}：
+    \begin{enumerate}
+      \item 确认扩展在 \texttt{chrome://extensions} 中状态为启用
+      \item 尝试在普通网站（如 Wikipedia、GitHub 等）上收藏
+      \item 刷新浏览器（Ctrl+R 或 Cmd+R）
+      \item 重启 Chrome 浏览器
+      \item 如果仍不行，卸载并重新安装扩展
+    \end{enumerate}
+\end{itemize}
+
+\subsubsection{Q：收藏成功但列表中看不到新项目}
+
+\begin{itemize}
+  \item \textbf{原因}：界面未及时刷新或项目显示位置被搜索过滤
+  \item \textbf{解决方案}：
+    \begin{enumerate}
+      \item 检查是否启用了搜索过滤，清空搜索框
+      \item 点击清空按钮（X 图标）清除搜索条件
+      \item 向上滚动列表查看最新的项目（新项目通常在最前面）
+      \item 刷新扩展弹窗或重新打开扩展
+      \item 检查浏览器控制台是否有错误（按 F12 打开开发者工具）
+    \end{enumerate}
+\end{itemize}
+
+\subsubsection{Q：搜索结果为空或搜索很慢}
+
+\begin{itemize}
+  \item \textbf{原因}：
+    \begin{enumerate}
+      \item 搜索关键词不匹配任何内容
+      \item 收藏数据库过大导致搜索变慢
+      \item 浏览器性能问题
+    \end{enumerate}
+  \item \textbf{解决方案}：
+    \begin{enumerate}
+      \item 尝试更短的搜索关键词
+      \item 清除搜索框，查看是否有收藏数据
+      \item 检查是否无意中删除了所有数据
+      \item 如果有数千个收藏，搜索可能需要几秒钟，这是正常的
+      \item 关闭其他标签页和应用以释放系统资源
+      \item 重启浏览器
+    \end{enumerate}
+\end{itemize}
+
+\subsubsection{Q：无法打开搜索到的链接}
+
+\begin{itemize}
+  \item \textbf{原因}：原始网站可能离线、链接失效或被屏蔽
+  \item \textbf{解决方案}：
+    \begin{enumerate}
+      \item 检查网址是否正确（编辑项目查看完整 URL）
+      \item 尝试复制链接到地址栏手动访问
+      \item 检查网络连接
+      \item 查看收藏时填写的原始链接是否有错误
+      \item 如果是失效链接，可编辑项目更新链接
+      \item 使用 Wayback Machine (\url{https://web.archive.org}) 查看历史版本
+    \end{enumerate}
+\end{itemize}
+
+\subsection{数据管理问题}
+
+\subsubsection{Q：如何确保数据不会丢失}
+
+\begin{itemize}
+  \item \textbf{最佳实践}：
+    \begin{enumerate}
+      \item \textbf{定期备份}：每月导出一次数据
+      \item \textbf{多份副本}：将备份文件保存到多个位置（本地 + 云存储）
+      \item \textbf{避免清除缓存}：清除浏览数据时不要选中"扩展程序"
+      \item \textbf{谨慎卸载}：卸载前必须导出数据
+      \item \textbf{定期检查}：每季度检查一次备份文件的完整性
+    \end{enumerate}
+\end{itemize}
+
+\subsubsection{Q：导出的文件无法打开或导入失败}
+
+\begin{itemize}
+  \item \textbf{原因}：
+    \begin{enumerate}
+      \item 文件格式不匹配
+      \item 文件被损坏
+      \item 编码问题（尤其是中文字符）
+    \end{enumerate}
+  \item \textbf{解决方案}：
+    \begin{enumerate}
+      \item 确认导与反馈 =====
+\section{技术支持与反馈}
+
+\subsection{获取帮助的途径}
+
+\subsubsection{在线文档}
+\begin{itemize}
+  \item \textbf{项目 README}：包含基本信息和快速开始指南
+  \item \textbf{开发文档}：\texttt{dev-docs} 文件夹中包含详细的技术文档
+    \begin{itemize}
+      \item 需求说明文档
+      \item 实现方案文档
+      \item 优化和性能分析文档
+    \end{itemize}
+  \item \textbf{本文档}：操作说明书（您当前正在阅读）
+\end{itemize}
+
+\subsubsection{GitHub 仓库}
+\begin{itemize}
+  \item \textbf与版本历史 =====
+\section{更新日志与版本历史}
+
+\subsection{版本 1.0（初始版本）}
+
+\subsubsection{核心功能}
+\begin{itemize}
+  \item \textbf{一键收藏}：支持快速收藏当前网页
+  \item \textbf{收藏管理}：编辑和删除已收藏的网页
+  \item \textbf{搜索功能}：实时关键词搜索和过滤
+  \item \textbf{导入收藏夹}：从 Chrome 收藏和 HTML 文件导入
+  \item \textbf{滚动加载}：虚拟滚动优化大数据集性能
+  \item \textbf{主题支持}：浅色和深色主题
+  \item \textbf{显示模式}：标准和紧凑模式切换
+\end{itemize}
+
+\subsubsection{数据管理}
+\begin{itemize}
+  \item \textbf{数据导出}：支持 JSON 和 HTML 格式
+  \item \textbf{数据导入}：从备份文件恢复数据
+  \item \textbf{本地存储}：使用 IndexedDB 存储，数据不上传云端
+  \item \textbf{隐私保护}：所有数据保存在本地
+\end{itemize}
+
+\subsubsection{用户界面}
+\begin{itemize}
+  \item 简洁的弹出窗口设计
+  \item 直观的列表视图
+  \item 快速操作按钮
+  \item 设置面板
+\end{itemize}
+
+\subsubsection{已知限制}
+\begin{itemize}
+  \item 仅支持 Chrome 浏览器
+  \item 数据同步需要手动导入导出
+  \item 不支持浏览器跨设备 Sync（需要手动操作）
+\end{itemize}
+
+\subsection{后续版本计划（可能的更新）}
+
+\subsubsection{版本 1.1（预期功能）}
+\begin{itemize}
+  \item 标签/分类管理
+  \item 收藏夹分组
+  \item 更高级的搜索过滤器
+  \item 批量操作功能
+\end{itemize}
+
+\subsubsection{版本 1.2（预期功能）}
+\begin{itemize}
+  \item 云同步功能（如 Google 帐户集成）
+  \item 内容预览
+  \item 浏览历史集成
+  \item 自动备份
+\end{itemize}
+
+\subsubsection{长期规划}
+\begin{itemize}
+  \item 移动应用版本
+  \item Firefox 和 Edge 浏览器支持
+  \item Web 应用版本
+  \item AI 辅助组织和推荐功能
+\end{itemize}
+
+\vspace{5pt}
+
+% ===== 10. 用户故事与使用场景 =====
+\section{用户故事与使用场景}
+
+\subsection{学生研究场景}
+
+\subtitle{场景描述}
+小王是大学生，正在撰写关于网络隐私的论文。他经常在网上查找相关论文、新闻和技术文档。
+
+\subtitle{使用步骤}
+\begin{enumerate}
+  \item 安装 Reading Share 扩展
+  \item 浏览找到的论文或文章时，点击扩展图标快速收藏
+  \item 为每个收藏添加标签，如"隐私政策"、"案例分析"等
+  \item 使用搜索功能快速定位特定主题的资料
+  \item 在论文完成前导出所有收藏作为参考资料备份
+  \item 将收藏分享给论文指导老师或组队成员
+\end{enumerate}
+
+\subtitle{获得的收益}
+\begin{itemize}
+  \item 高效整理研究资料
+  \item 快速查找引用来源
+  \item 保留所有参考链接
+  \item 便于与他人协作
+\end{itemize}
+
+\subsection{内容创作者场景}
+
+\subtitle{场景描述}
+李某是一个技术博客作者，需要不断收集灵感、最新技术新闻和代码示例。
+
+\subtitle{使用步骤}
+\begin{enumerate}
+  \item 启用扩展的快捷键功能（可选）
+  \item 浏览时发现有用的技术文章、教程或代码库，快速收藏
+  \item 定期导出收藏数据备份到云存储
+  \item 使用搜索功能按技术栈快速查找相关资料
+  \item 编写博文时快速参考已收藏的资料
+  \item 在多个写作设备间同步收藏（导入导出）
+\end{enumerate}
+
+\subtitle{获得的收益}
+\begin{itemize}
+  \item 建立个人知识库
+  \item 提高写作效率
+  \item 确保参考资料完整
+  \item 灵感随时可查
+\end{itemize}
+
+\subsection{信息收集者场景}
+
+\subtitle{场景描述}
+张某是市场分析师，需要收集竞争对手信息、行业动态和市场报告。
+
+\subtitle{使用步骤}
+\begin{enumerate}
+  \item 安装扩展用于日常信息收集
+  \item 浏览行业新闻网站、竞争对手网站时收藏重要页面
+  \item 使用搜索功能按公司名称、产品等分类查找信息
+  \item 定期导出收藏作为分析报告的数据源
+  \item 与团队共享导出的收藏文件进行协作分析
+\end{enumerate}
+
+\subtitle{获得的收益}
+\begin{itemize}
+  \item 系统化信息管理
+  \item 快速信息检索
+  \item 完整的信息历史记录
+  \item 便于团队协作
+\end{itemize}
+
+\vspace{5pt}
+
+% ===== 11. 最佳实践与使用建议 =====
+\section{最佳实践与使用建议}
+
+\subsection{数据组织最佳实践}
+
+\subsubsection{使用有意义的标题}
+\begin{itemize}
+  \item \textbf{不好的例子}：
+    \begin{itemize}
+      \item "新标签页"
+      \item "Website"
+      \item "Page 1"
+    \end{itemize}
+  \item \textbf{好的例子}：
+    \begin{itemize}
+      \item "Python 异步编程最佳实践 - Real Python"
+      \item "Chrome 扩展开发 - Google 官方文档"
+      \item "2024年网络安全趋势报告"
+    \end{itemize}
+\end{itemize}
+
+\subsubsection{充分利用备注字段}
+\begin{itemize}
+  \item 添加收藏原因
+  \item 记录关键要点
+  \item 标注个人感受和评价
+  \item 链接相关资源
+\end{itemize}
+
+\subsubsection{定期审查和清理}
+\begin{itemize}
+  \item 每月清理过期或无用的收藏
+  \item 删除重复的项目
+  \item 更新失效的链接
+  \item 保持收藏库的质量和相关性
+\end{itemize}
+
+\subsection{搜索使用技巧}
+
+\subsubsection{精准搜索}
+\begin{itemize}
+  \item 使用具体的关键词而不是通用词汇
+  \item 例如：搜索"Vue 3 组件"比搜索"Vue"效果更好
+  \item 组合多个关键词缩小搜索范围
+\end{itemize}
+
+\subsubsection{浏览而非仅搜索}
+\begin{itemize}
+  \item 偶尔清空搜索框浏览最近的收藏
+  \item 可以发现遗忘的有用资料
+  \item 帮助保持对已收藏内容的记忆
+\end{itemize}
+
+\subsection{数据备份最佳实践}
+
+\subsubsection{定期备份计划}
+\begin{itemize}
+  \item \textbf{每周}：对活跃的新收藏进行备份
+  \item \textbf{每月}：进行完整的数据导出
+  \item \textbf{每季度}：验证备份文件的完整性
+\end{itemize}
+
+\subsubsection{备份存储策略}
+\begin{itemize}
+  \item 本地存储：至少 2 个物理位置的副本
+  \item 云存储：至少 1 个云服务备份（Google Drive、Dropbox 等）
+  \item 离线存储：重要数据的光盘或 U 盘副本
+\end{itemize}
+
+\subsection{性能优化建议}
+
+\subsubsection{管理收藏数量}
+\begin{itemize}
+  \item 定期清理陈旧数据保持库相对整洁
+  \item 可以按年份分批管理（存档旧年份数据）
+  \item 避免在单一数据库中保存超过 10 万条记录
+\end{itemize}
+
+\subsubsection{系统优化}
+\begin{itemize}
+  \item 关闭浏览器中不必要的扩展
+  \item 定期清除浏览器缓存（但不清除扩展数据）
+  \item 定期重启浏览器保持性能
+  \item 更新 Chrome 到最新版本
+\end{itemize}
+
+\vspace{5pt}
+
+% ===== 页脚 =====
+\begin{center}
+\small
+Reading Share Chrome Extension 操作说明书 | 版本 1.0\\
+最后更新：2026年2月\\
+\vspace{3pt}
+\textit{本文档详细介绍了 Reading Share 扩展的各项功能和使用方法。}\\
+\textit{如有问题或建议，欢迎通过 GitHub Issues 反馈。}tbf{操作系统}：Windows 10/11、macOS、Linux（具体版本）
+  \item \textbf{Chrome 版本}：在 Chrome 菜单 > 关于 Google Chrome 中查看
+  \item \textbf{扩展版本}：在 chrome://extensions 中查看
+  \item \textbf{其他相关信息}：CPU、内存、是否为特殊网络环境等
+\end{itemize}
+
+\subtitle{问题描述}
+\begin{itemize}
+  \item \textbf{问题标题}：简洁地概括问题（5-10 个词）
+  \item \textbf{问题现象}：详细描述发生了什么
+  \item \textbf{期望行为}：描述应该发生什么
+  \item \textbf{复现步骤}：清晰列出导致问题的步骤
+    \begin{enumerate}
+      \item 第一步：...
+      \item 第二步：...
+      \item 第三步：...（导致问题）
+    \end{enumerate}
+\end{itemize}
+
+\subtitle{附加信息}
+\begin{itemize}
+  \item \textbf{截图或录屏}：清晰显示问题的视觉证据
+  \item \textbf{错误信息}：开发者工具控制台中的错误堆栈跟踪
+  \item \textbf{日志文件}：如果有可用的应用日志
+  \item \textbf{数据样本}：如适用，提供造成问题的数据示例（已脱敏）
+\end{itemize}
+
+\subsubsection{提交问题到 GitHub}
+\begin{enumerate}
+  \item 访问项目的 GitHub Issues 页面
+  \item 点击"New Issue"按钮
+  \item 选择合适的 Issue 模板（如有）
+  \item 按照上述信息清单填写问题详情
+  \item 添加相关的标签（bug、enhancement、question 等）
+  \item 提交 Issue
+  \item 等待开发者的回复和确认
+\end{enumerate}
+
+\subsection{提交功能请求}
+
+\subsubsection{反馈新功能想法}
+\begin{itemize}
+  \item \textbf{功能描述}：清晰描述想要的新功能
+  \item \textbf{使用场景}：解释在什么情况下会用到这个功能
+  \item \textbf{预期效果}：描述功能应该如何工作
+  \item \textbf{类似功能}：提供类似的功能或竞品参考
+  \item \textbf{优先级}：说明这对您有多重要
+\end{itemize}
+
+\subsubsection{提交流程}
+\begin{enumerate}
+  \item 访问项目 GitHub Issues
+  \item 点击"New Issue"
+  \item 选择"Feature Request"模板（如有）
+  \item 使用前缀 \texttt{[Feature Request]} 标记问题标题
+  \item 按照上述要点填写详细信息
+  \item 标记为 \texttt{enhancement} 标签
+  \item 提交等待反馈
+\end{enumerate}
+
+\subsection{获取更新通知}
+
+\subsubsection{关注项目更新}
+\begin{itemize}
+  \item 在 GitHub 项目页面点击"Watch"关注更新
+  \item 订阅 Release 通知获知新版本发布
+  \item 点击项目的"Star"表示支持（可选）
+\end{itemize}
+
+\subsubsection{检查扩展更新}
+\begin{itemize}
+  \item Chrome 会自动检查扩展更新（通常每几小时一次）
+  \item 手动检查：打开 \texttt{chrome://extensions}，点击右上角"刷新"
+  \item 有新版本可用时，扩展条目会显示更新提示
+  \item 点击"更新"按钮立即更新{跳过}：不导入重复项，保留原有项目
+      \item \textbf{覆盖}：用新数据替换原有项目（包括更新时间等）
+      \item \textbf{保留两份}：同时保留两个版本的项目
+    \end{enumerate}
+  \item \textbf{建议}：
+    \begin{enumerate}
+      \item 大多数情况下选择"跳过"
+      \item 只在确认新版本更新的情况下选"覆盖"
+      \item 如果不确定差异，选"保留两份"后手动查看和删除
+    \end{enumerate}
+\end{itemize}
+
+\subsubsection{Q：误删了重要的收藏，如何恢复}
+
+\begin{itemize}
+  \item \textbf{如果已有备份}：
+    \begin{enumerate}
+      \item 从云存储或本地备份找到最近的导出文件
+      \item 打开设置 > 数据管理 > 导入数据
+      \item 选择备份文件并导入
+      \item 处理重复项时选择合适的选项
+    \end{enumerate}
+  \item \textbf{如果没有备份}：
+    \begin{enumerate}
+      \item 删除后的数据无法恢复
+      \item 检查浏览器的回收站或系统回收站
+      \item 某些情况下可以联系 Chrome 数据恢复服务（如使用 Sync）
+    \end{enumerate}
+  \item \textbf{预防措施}：
+    \begin{enumerate}
+      \item 删除前始终手动确认
+      \item 对重要数据建立月度备份
+      \item 使用云存储保存备份副本
+    \end{enumerate}
+\end{itemize}
+
+\subsection{性能与兼容性问题}
+
+\subsubsection{Q：扩展运行很慢，有数千个收藏时特别明显}
+
+\begin{itemize}
+  \item \textbf{原因}：收藏数据量大导致的性能问题
+  \item \textbf{解决方案}：
+    \begin{enumerate}
+      \item 使用搜索功能缩小显示范围（减少渲染的项目数）
+      \item 关闭浏览器其他标签页和应用释放资源
+      \item 升级计算机 RAM（如果系统内存不足）
+      \item 考虑定期清理过期或无用的收藏，保持数据库整洁
+      \item 将大量数据分批导出，保持活跃数据库相对较小
+    \end{enumerate}
+\end{itemize}
+
+\subsubsection{Q：滚动时出现卡顿或漂移}
+
+\begin{itemize}
+  \item \textbf{原因}：虚拟滚动实现问题或系统资源不足
+  \item \textbf{解决方案}：
+    \begin{enumerate}
+      \item 尝试用虚拟滚动的替代模式（如果设置中有该选项）
+      \item 关闭浏览器硬件加速（Chrome 菜单 > 设置 > 系统 > 关闭硬件加速）
+      \item 清除浏览器缓存
+      \item 禁用其他扩展来排除冲突
+      \item 重启浏览器
+    \end{enumerate}
+\end{itemize}
+
+\subsubsection{Q：与其他扩展冲突，出现异常行为}
+
+\begin{itemize}
+  \item \textbf{排查步骤}：
+    \begin{enumerate}
+      \item 进入 Chrome 扩展管理页面
+      \item 逐个禁用其他扩展，每次禁用后测试 Reading Share
+      \item 找出冲突的扩展
+      \item 卸载冲突扩展，或联系扩展开发者反馈
+    \end{enumerate}
+  \item \textbf{常见冲突扩展}：
+    \begin{itemize}
+      \item 某些广告拦截器
+      \item 页面修改类扩展
+      \item 数据分析追踪类扩展
+    \end{itemize}
+\end{itemize}
+
+\subsection{跨浏览器兼容性}
+
+\subsubsection{Q：能在 Firefox、Edge 等浏览器中使用吗}
+
+\begin{itemize}
+  \item \textbf{当前状态}：Reading Share 目前仅为 Chrome 浏览器开发
+  \item \textbf{解决方案}：
+    \begin{enumerate}
+      \item 考虑使用 Chromium 内核浏览器（Edge、Brave 等），某些版本可能兼容
+      \item 在 Firefox 上，使用 Chrome 扩展兼容层（需要额外配置）
+      \item 使用浏览器云同步功能（如 Chrome Sync）在设备间共享
+      \item 通过导出/导入数据在不同浏览器间转移收藏
+    \end{enumerate}永久删除所有收藏数据，无法撤销。确定要继续吗?''
+  \item 某些版本要求输入确认码（如 \texttt{DELETE}）或再次点击确认按钮
+  \item 点击确认后，所有数据会立即被删除
+  \item 扩展会重启，显示空的收藏列表
+\end{enumerate}
+
+\subsection{其他设置选项}
+
+\subtitle{性能与隐私}
+\begin{itemize}
+  \item \textbf{启用日志记录}：记录扩展操作日志，便于故障排查
+  \item \textbf{隐私模式}：某些版本支持隐私浏览模式下禁用收藏功能
+  \item \textbf{自动同步}：在支持的情况下启用自动数据备份
+\end{itemize}
+
+\subtitle{快捷键与键盘设置}
+\begin{itemize}
+  \item \textbf{快捷键}：某些版本支持自定义键盘快捷键来快速收藏网页
+  \item \textbf{配置方法}：在 Chrome 扩展管理页面 > 键盘快捷键部分配置item \textbf{结果数量}：底部状态栏显示"找到 X 个结果"
+  \item \textbf{无结果提示}：如果没有找到匹配项，会显示"未找到相关内容"的提示
+\end{itemize}
+
+\subsection{导入收藏夹}
+
+\subtitle{从浏览器导入 Chrome 收藏}
+\begin{enumerate}
+  \item \textbf{打开设置面板}：点击扩展弹出窗口右上角的设置按钮（齿轮图标）
+  \item \textbf{找到导入选项}：在设置中找到"导入 Chrome 收藏夹"或"导入书签"选项
+  \item \textbf{选择收藏夹}：
+    \begin{itemize}
+      \item 选择导入所有收藏夹，或
+      \item 仅导入特定的书签文件夹
+    \end{itemize}
+  \item \textbf{确认导入}：点击开始导入按钮
+  \item \textbf{进度显示}：导入过程中会显示进度条，显示已导入的数量
+  \item \textbf{完成提示}：导入完成后显示"已导入 X 个书签"的成功提示
+  \item \textbf{查看导入结果}：返回主界面，新导入的书签会显示在列表中
+\end{enumerate}
+
+\subtitle{从 HTML 文件导入}
+\begin{enumerate}
+  \item \textbf{准备 HTML 文件}：
+    \begin{itemize}
+      \item 从 Chrome 导出书签：Chrome 菜单 > 书签 > 书签管理器 > 右上方菜单 > 导出书签
+      \item 或从其他浏览器导出为 HTML 格式的书签文件
+    \end{itemize}
+  \item \textbf{打开设置}：点击扩展设置按钮
+  \item \textbf{选择导入文件}：找到"从文件导入"选项
+  \item \textbf{选择 HTML 文件}：
+    \begin{enumerate}
+      \item 点击"选择文件"按钮
+      \item 在系统文件对话框中定位书签 HTML 文件
+      \item 选中后点击打开
+    \end{enumerate}
+  \item \textbf{开始导入}：系统自动解析 HTML 文件并导入书签数据
+  \item \textbf{处理重复}：
+    \begin{itemize}
+      \item 如果导入的书签已存在，系统会提示如何处理
+      \item 选项包括：跳过、覆盖、或保留两份副本
+    \end{itemize}
+  \item \textbf{导入完成}：显示导入统计信息和成功提示
+\end{enumerate}
+
+\subtitle{导入注意事项}
+\begin{itemize}
+  \item \textbf{备份原数据}：导入前请备份现有的收藏数据
+  \item \textbf{检查导入结果}：导入后检查是否有重复或错误的条目
+  \item \textbf{大量数据导入}：导入几千个书签时可能需要数分钟，请耐心等待
+  \item \textbf{文件格式}：仅支持标准的 HTML 书签格式文件
+\end{itemize}
+
+\subsection{滚动加载优化}
+
+\subtitle{虚拟滚动技术}
+\begin{itemize}
+  \item \textbf{高效内存使用}：即使收藏了数千个网页，扩展仍然能保持快速响应
+  \item \textbf{流畅滚动体验}：只在可视区域渲染列表项，滚动时不会卡顿
+  \item \textbf{自动预加载}：当滚动接近底部时，自动加载下一批数据
+\end{itemize}
+
+\subtitle{使用滚动加载}
+\begin{enumerate}
+  \item \textbf{打开列表}：打开扩展弹出窗口显示收藏列表
+  \item \textbf{向下滚动}：在列表中向下滚动查看更多内容
+  \item \textbf{自动加载}：当滚动到列表接近底部时（通常最后几项可见时）
+  \item \textbf{加载提示}：底部会显示"加载中..."或加载动画
+  \item \textbf{继续浏览}：新加载的内容会自动添加到列表末尾
+  \item \textbf{性能保证}：即使有数万个收藏项，滚动性能也很流畅
+\end{enumeratize}
+  \stepitem{收藏当前网页}{%
+    在任何网页上点击扩展图标，将当前页面添加到收藏夹
+  }
+  \stepitem{查看收藏内容}{%
+    打开弹出窗口查看所有已收藏的内容
+  }
+  \stepitem{删除收藏}{%
+    在列表中找到要删除的项目，点击删除按钮即可
+  }
+\end{itemize}
+
+\subsection{搜索与过滤}
+\begin{itemize}
+  \stepitem{关键词搜索}{%
+    在搜索框输入关键词，实时过滤匹配的结果
+  }
+  \stepitem{智能匹配}{%
+    支持对标题、URL 等多个字段的搜索
+  }
+\end{itemize}
+
+\subsection{导入收藏夹}
+\begin{itemize}
+  \stepitem{导入浏览器收藏}{%
+    在设置中选择导入功能，将 Chrome 收藏夹导入到扩展
+  }
+  \stepitem{批量导入}{%
+    支持从 HTML 文件导入收藏夹数据
+  }
+\end{itemize}
+
+\subsection{滚动加载优化}
+\begin{itemize}
+  \stepitem{高效加载}{%
+    当列表滚动到底部时，自动加载更多内容
+  }
+  \stepitem{性能优化}{%
+    采用虚拟滚动技术，确保流畅的用户体验
+  }
+\end{itemize}
+
+\vspace{5pt}
+
+% ===== 5. 设置与配置 =====
+\section{设置与配置}
+
+\subsection{打开设置面板}
+\begin{itemize}
+  \item 点击扩展弹出窗口中的设置按钮
+  \item 或访问扩展选项页面（右键点击扩展图标 → 选项）
+\end{itemize}
+
+\subsection{可配置项}
+\begin{itemize}
+  \stepitem{主题设置}{%
+    选择浅色或深色主题，适应不同使用场景
+  }
+  \stepitem{显示模式}{%
+    在标准模式和紧凑模式之间切换
+  }
+  \stepitem{数据导出}{%
+    将收藏数据导出为 JSON 或 HTML 格式
+  }
+  \stepitem{数据清除}{%
+    清空所有收藏数据（需确认）
+  }
+\end{itemize}
+
+\vspace{5pt}
+
+% ===== 6. 数据管理 =====
+\section{数据管理}
+
+\subsection{数据存储}
+\begin{itemize}
+  \item 所有数据存储在本地浏览器数据库中（IndexedDB）
+  \item 数据不会上传到任何远程服务器
+  \item 卸载扩展前请导出重要数据
+\end{itemize}
+
+\subsection{数据备份}
+\begin{itemize}
+  \stepitem{导出数据}{%
+    在设置中选择导出功能，保存备份文件到本地
+  }
+  \stepitem{导入备份}{%
+    使用导入功能从备份文件恢复数据
+  }
+\end{itemize}
+
+\vspace{5pt}
+
+% ===== 7. 常见问题 =====
+\section{常见问题}
+
+\subsection{Q：扩展无法加载怎么办？}
+\begin{itemize}
+  \item 确保 Chrome 版本为最新版本
+  \item 检查开发者模式是否启用
+  \item 尝试刷新扩展或重启浏览器
+\end{itemize}
+
+\subsection{Q：数据会丢失吗？}
+\begin{itemize}
+  \item 数据存储在本地浏览器数据库中，不会自动清除
+  \item 清除浏览器缓存时请勿选中"扩展程序"选项
+  \item 定期导出数据作为备份
+\end{itemize}
+
+\subsection{Q：如何快速搜索？}
+\begin{itemize}
+  \item 在搜索框中输入关键词，支持模糊匹配
+  \item 搜索结果实时更新，无需按 Enter
+\end{itemize}
+
+\subsection{Q：如何在多台设备同步？}
+\begin{itemize}
+  \item 导出当前设备上的数据
+  \item 在其他设备上导入导出的文件
+\end{itemize}
+
+\vspace{5pt}
+
+% ===== 8. 技术支持 =====
+\section{技术支持}
+
+\subsection{获取帮助}
+\begin{itemize}
+  \item 查看项目 GitHub 仓库中的 README 文件
+  \item 检查 dev-docs 文件夹中的详细文档
+  \item 提交问题到项目 Issue 追踪系统
+\end{itemize}
+
+\subsection{报告问题}
+\begin{itemize}
+  \item 描述问题的具体现象和复现步骤
+  \item 提供浏览器版本和系统信息
+  \item 附上相关截图或错误信息
+\end{itemize}
+
+\vspace{5pt}
+
+% ===== 9. 更新日志 =====
+\section{更新日志}
+
+\subsection{版本 1.0}
+\begin{itemize}
+  \item 基础收藏功能
+  \item 搜索和过滤功能
+  \item 导入收藏夹功能
+  \item 滚动加载优化
+  \item 紧凑模式展示
+  \item 数据备份与恢复
+\end{itemize}
+
+\vspace{10pt}
+
+% ===== 页脚 =====
+\begin{center}
+\small
+Reading Share Chrome Extension 操作说明书 | 版本 1.0\\
+最后更新：2026年2月
+\end{center}
+
+\end{document}
