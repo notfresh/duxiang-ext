@@ -11,9 +11,10 @@ document.addEventListener('DOMContentLoaded', function() {
   const linksContainer = document.getElementById('linksContainer');
   const addBtn = document.getElementById('addBtn');
   const importBookmarksBtn = document.getElementById('importBookmarksBtn');
-  const importJsonBtn = document.getElementById('importJsonBtn');
   const jsonFileInput = document.getElementById('jsonFileInput');
   const exportBtn = document.getElementById('exportBtn');
+  const settingsImportBtn = document.getElementById('settingsImportBtn');
+  const settingsExportBtn = document.getElementById('settingsExportBtn');
   const clearDataBtn = document.getElementById('clearDataBtn');
   const debugBtn = document.getElementById('debugBtn');
   const statusMessage = document.getElementById('statusMessage');
@@ -513,8 +514,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // 禁用按钮，防止重复点击
-    importJsonBtn.disabled = true;
-    importJsonBtn.textContent = '导入中...';
+    settingsImportBtn.disabled = true;
+    settingsImportBtn.textContent = '导入中...';
     
     try {
       showStatusMessage('正在读取文件...');
@@ -617,8 +618,8 @@ document.addEventListener('DOMContentLoaded', function() {
       showStatusMessage('导入失败: ' + errorMsg, true);
     } finally {
       // 恢复按钮状态
-      importJsonBtn.disabled = false;
-      importJsonBtn.textContent = '导入 JSON';
+      settingsImportBtn.disabled = false;
+      settingsImportBtn.textContent = '导入';
       // 重置文件输入，允许再次选择同一文件
       jsonFileInput.value = '';
     }
@@ -849,7 +850,14 @@ document.addEventListener('DOMContentLoaded', function() {
       showStatusMessage('保存设置失败: ' + errorMsg, true);
     }
   }
-  
+
+  // 绑定分组管理按钮事件
+  const groupsBtn = document.getElementById('groupsBtn');
+  groupsBtn.addEventListener('click', function() {
+    // 打开分组管理页面
+    window.location.href = 'group.html';
+  });
+
   // 绑定设置对话框事件
   settingsBtn.addEventListener('click', showSettingsDialog);
   settingsCancelBtn.addEventListener('click', hideSettingsDialog);
@@ -970,8 +978,9 @@ document.addEventListener('DOMContentLoaded', function() {
   // 绑定按钮事件
   addBtn.addEventListener('click', handleAddLink);
   importBookmarksBtn.addEventListener('click', handleImportBookmarks);
-  importJsonBtn.addEventListener('click', handleImportJson);
   exportBtn.addEventListener('click', exportData);
+  settingsImportBtn.addEventListener('click', handleImportJson);
+  settingsExportBtn.addEventListener('click', exportData);
   clearDataBtn.addEventListener('click', handleClearData);
   debugBtn.addEventListener('click', toggleDebugMode);
   

@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>分组管理</title>
+  <style>
+    /* 重置所有样式，确保没有冲突 */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 400px;
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      background-color: #f5f5f5;
+      padding: 0;
+      margin: 0;
+      overflow: hidden;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      max-height: 600px;
+    }
+
+    h1 {
+      font-size: 20px;
+      color: #333;
+      margin: 10px 0;
+      text-align: center;
+      background-color: #f5f5f5;
+      padding: 5px 0;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 10px 10px;
+      background-color: #f5f5f5;
+    }
+
+    .back-btn {
+      background-color: #666;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 5px 10px;
+      cursor: pointer;
+      font-size: 13px;
+      display: none;
+    }
+
+    .back-btn:hover {
+      background-color: #555;
+    }
+
+    .controls {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 10px;
+      background-color: #f5f5f5;
+      padding: 0 0 10px 0;
+    }
+
+    button {
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 5px 10px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: background-color 0.2s;
+    }
+
+    button:hover {
+      background-color: #45a049;
+    }
+
+    .secondary-btn {
+      background-color: #2196F3;
+    }
+
+    .secondary-btn:hover {
+      background-color: #1976d2;
+    }
+
+    .danger-btn {
+      background-color: #f44336;
+    }
+
+    .danger-btn:hover {
+      background-color: #d32f2f;
+    }
+
+    #container {
+      background-color: white;
+      min-height: 100px;
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      margin-bottom: 10px;
+      padding: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    /* 滚动条样式 */
+    #container::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    #container::-webkit-scrollbar-track {
+      background: #f1f1f1;
+    }
+
+    #container::-webkit-scrollbar-thumb {
+      background: #888;
+      border-radius: 4px;
+    }
+
+    #container::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
+
+    /* 分组卡片样式 */
+    .group-card {
+      background-color: #f9f9f9;
+      border-left: 4px solid #2196F3;
+      padding: 12px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: box-shadow 0.2s;
+    }
+
+    .group-card:hover {
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+
+    .group-card:last-child {
+      margin-bottom: 0;
+    }
+
+    .group-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .group-name {
+      font-weight: bold;
+      font-size: 16px;
+      color: #333;
+      flex-grow: 1;
+    }
+
+    .group-count {
+      font-size: 12px;
+      color: #666;
+      background-color: #eee;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-left: 8px;
+    }
+
+    .group-actions {
+      display: flex;
+      gap: 4px;
+    }
+
+    .action-btn {
+      background-color: transparent;
+      color: #999;
+      border: none;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
+      transition: all 0.2s;
+    }
+
+    .action-btn:hover {
+      background-color: #2196F3;
+      color: white;
+    }
+
+    .action-btn.delete:hover {
+      background-color: #f44336;
+    }
+
+    /* 链接卡片样式 */
+    .link-card {
+      background-color: #f9f9f9;
+      border-left: 4px solid #4CAF50;
+      padding: 12px;
+      margin-bottom: 10px;
+      transition: box-shadow 0.2s;
+    }
+
+    .link-card:last-child {
+      margin-bottom: 0;
+    }
+
+    .link-card:hover {
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .link-title {
+      font-weight: bold;
+      font-size: 16px;
+      color: #333;
+      flex-grow: 1;
+      margin-bottom: 0;
+      line-height: 1.3;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 100%;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .link-title:hover {
+      color: #2a7ae2;
+      text-decoration: underline;
+    }
+
+    .link-url {
+      word-break: break-all;
+      margin-bottom: 8px;
+      font-size: 14px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 100%;
+    }
+
+    .link-url a {
+      color: #2a7ae2;
+      text-decoration: none;
+    }
+
+    .link-url a:hover {
+      text-decoration: underline;
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .remove-btn {
+      background-color: transparent;
+      color: #999;
+      border: none;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
+      transition: all 0.2s;
+    }
+
+    .remove-btn:hover {
+      background-color: #f44336;
+      color: white;
+    }
+
+    /* 编辑对话框样式 */
+    .edit-dialog-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+
+    .edit-dialog-overlay.show {
+      display: flex;
+    }
+
+    .edit-dialog {
+      background-color: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      width: 90%;
+      max-width: 350px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .edit-dialog h2 {
+      margin: 0 0 15px 0;
+      font-size: 18px;
+      color: #333;
+    }
+
+    .edit-dialog .input-group {
+      margin-bottom: 12px;
+    }
+
+    .edit-dialog .input-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 14px;
+      color: #555;
+      font-weight: 500;
+    }
+
+    .edit-dialog .input-group input,
+    .edit-dialog .input-group textarea {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+
+    .edit-dialog .input-group input:focus,
+    .edit-dialog .input-group textarea:focus {
+      outline: none;
+      border-color: #4CAF50;
+    }
+
+    .edit-dialog .button-group {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 15px;
+    }
+
+    .edit-dialog .button-group button {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background-color 0.2s;
+    }
+
+    .edit-dialog .button-group .cancel-btn {
+      background-color: #f5f5f5;
+      color: #333;
+    }
+
+    .edit-dialog .button-group .cancel-btn:hover {
+      background-color: #e0e0e0;
+    }
+
+    .edit-dialog .button-group .save-btn {
+      background-color: #4CAF50;
+      color: white;
+    }
+
+    .edit-dialog .button-group .save-btn:hover {
+      background-color: #45a049;
+    }
+
+    /* 空状态 */
+    .empty-state {
+      text-align: center;
+      padding: 30px 0;
+      color: #666;
+    }
+
+    .empty-state p {
+      margin-bottom: 15px;
+    }
+
+    /* 搜索框样式 */
+    .search-container {
+      padding: 10px;
+      background-color: #f5f5f5;
+      border-bottom: 1px solid #eee;
+    }
+
+    .search-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 8px 30px 8px 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+
+    .search-input:focus {
+      outline: none;
+      border-color: #4CAF50;
+    }
+
+    .search-clear-btn {
+      position: absolute;
+      right: 8px;
+      background: transparent;
+      border: none;
+      color: #999;
+      cursor: pointer;
+      font-size: 18px;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+
+    .search-clear-btn:hover {
+      color: #333;
+    }
+
+    /* 状态消息 */
+    .status-message {
+      text-align: center;
+      margin: 0;
+      padding: 8px;
+      background-color: #f8f8f8;
+      font-size: 14px;
+      color: #666;
+      border-top: 1px solid #eee;
+    }
+
+    .status-message.error {
+      background-color: #fff0f0;
+      color: #d32f2f;
+    }
+
+    /* 选择链接对话框 */
+    .link-selector {
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .link-selector-item {
+      display: flex;
+      align-items: center;
+      padding: 8px;
+      border-bottom: 1px solid #eee;
+      cursor: pointer;
+    }
+
+    .link-selector-item:hover {
+      background-color: #f5f5f5;
+    }
+
+    .link-selector-item input {
+      margin-right: 8px;
+    }
+
+    .link-selector-item .item-title {
+      font-size: 14px;
+      color: #333;
+      flex-grow: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .link-selector-item .item-url {
+      font-size: 12px;
+      color: #999;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 150px;
+    }
+
+    /* ========== 紧凑模式样式 ========== */
+    body.compact-mode .group-card {
+      padding: 8px;
+      margin-bottom: 6px;
+    }
+
+    body.compact-mode .group-header {
+      margin-bottom: 4px;
+    }
+
+    body.compact-mode .group-name {
+      font-size: 14px;
+    }
+
+    body.compact-mode .group-count {
+      font-size: 11px;
+      padding: 1px 6px;
+    }
+
+    body.compact-mode .link-card {
+      padding: 8px;
+      margin-bottom: 6px;
+    }
+
+    body.compact-mode .card-header {
+      margin-bottom: 4px;
+    }
+
+    body.compact-mode .link-title {
+      font-size: 14px;
+    }
+
+    body.compact-mode .link-url {
+      margin-bottom: 4px;
+      font-size: 12px;
+    }
+
+    body.compact-mode .action-btn,
+    body.compact-mode .remove-btn {
+      width: 20px;
+      height: 20px;
+      font-size: 12px;
+    }
+
+    body.compact-mode h1 {
+      font-size: 18px;
+      margin: 8px 0;
+    }
+
+    body.compact-mode .back-btn {
+      font-size: 12px;
+      padding: 4px 8px;
+    }
+
+    body.compact-mode .controls button {
+      padding: 4px 8px;
+      font-size: 12px;
+    }
+
+    body.compact-mode .search-container {
+      padding: 6px;
+    }
+
+    body.compact-mode .search-input {
+      padding: 6px 24px 6px 8px;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <h1>分组管理</h1>
+
+  <div class="header">
+    <button id="backBtn" class="back-btn">← 返回分组</button>
+    <button id="homeBtn" class="back-btn" style="display: none;">← 返回主页</button>
+    <span></span>
+  </div>
+
+  <!-- 搜索框（仅在组内视图显示） -->
+  <div id="searchContainer" class="search-container" style="display: none;">
+    <div class="search-wrapper">
+      <input type="text" id="searchInput" class="search-input" placeholder="搜索标题或网址...">
+      <button id="clearSearchBtn" class="search-clear-btn" title="清除搜索">×</button>
+    </div>
+  </div>
+
+  <div id="container">
+    <div class="empty-state">
+      <p>暂无分组</p>
+      <p>点击下方"新建分组"按钮创建</p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="addGroupBtn">新建分组</button>
+    <button id="exportGroupsBtn" class="secondary-btn">导出分组</button>
+    <button id="importGroupsBtn" class="secondary-btn">导入分组</button>
+    <button id="openAllBtn" class="secondary-btn" style="display: none;">批量打开</button>
+    <button id="addLinkBtn" class="secondary-btn" style="display: none;">添加链接</button>
+  </div>
+
+  <!-- 隐藏的文件输入，用于导入 JSON -->
+  <input type="file" id="importFileInput" accept=".json" style="display: none;">
+
+  <div id="statusMessage" class="status-message" style="display: none;"></div>
+
+  <!-- 新建/编辑分组对话框 -->
+  <div id="groupDialogOverlay" class="edit-dialog-overlay">
+    <div class="edit-dialog">
+      <h2 id="groupDialogTitle">新建分组</h2>
+      <div class="input-group">
+        <label for="groupNameInput">分组名称</label>
+        <input type="text" id="groupNameInput" placeholder="请输入分组名称">
+      </div>
+      <div class="button-group">
+        <button id="groupCancelBtn" class="cancel-btn">取消</button>
+        <button id="groupSaveBtn" class="save-btn">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 编辑链接对话框 -->
+  <div id="linkDialogOverlay" class="edit-dialog-overlay">
+    <div class="edit-dialog">
+      <h2>编辑链接</h2>
+      <div class="input-group">
+        <label for="linkTitleInput">标题</label>
+        <input type="text" id="linkTitleInput" placeholder="链接标题">
+      </div>
+      <div class="input-group">
+        <label for="linkUrlInput">网址</label>
+        <input type="text" id="linkUrlInput" placeholder="链接地址">
+      </div>
+      <div class="button-group">
+        <button id="linkCancelBtn" class="cancel-btn">取消</button>
+        <button id="linkSaveBtn" class="save-btn">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 选择链接对话框 -->
+  <div id="selectLinkDialogOverlay" class="edit-dialog-overlay">
+    <div class="edit-dialog">
+      <h2>选择要添加的链接</h2>
+      <div class="input-group">
+        <input type="text" id="linkSearchInput" placeholder="搜索标题或网址..." style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; margin-bottom: 10px;">
+      </div>
+      <div id="linkSelectorContainer" class="link-selector">
+        <!-- 链接列表 -->
+      </div>
+      <div class="button-group">
+        <button id="selectLinkCancelBtn" class="cancel-btn">取消</button>
+        <button id="selectLinkSaveBtn" class="save-btn">添加</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 删除确认对话框 -->
+  <div id="deleteDialogOverlay" class="edit-dialog-overlay">
+    <div class="edit-dialog">
+      <h2>确认删除</h2>
+      <p id="deleteMessage" style="margin-bottom: 15px; color: #666;"></p>
+      <div class="button-group">
+        <button id="deleteCancelBtn" class="cancel-btn">取消</button>
+        <button id="deleteConfirmBtn" class="danger-btn" style="background-color: #f44336; color: white;">删除</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="group.js"></script>
+</body>
+</html>

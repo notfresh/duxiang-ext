@@ -8,7 +8,9 @@ import { parseTags, tagsArrayToString } from './utils.js';
 
 const DB_NAME = 'readingLinks';
 const DB_VERSION = 2; // 使用版本 2，避免升级阻塞问题
+
 const STORE_NAME = 'links';
+const GROUPS_STORE_NAME = 'groups'; // 新增分组对象存储
 
 let dbInstance = null;
 
@@ -62,6 +64,11 @@ async function initDB() {
         store.createIndex('url', 'url', { unique: true });
         store.createIndex('timestamp', 'timestamp');
       }
+      // 创建分组对象存储（如果不存在）
+      if (!db.objectStoreNames.contains(GROUPS_STORE_NAME)) {
+        console.log(`[initDB] 创建对象存储: ${GROUPS_STORE_NAME}`);
+        db.createObjectStore(GROUPS_STORE_NAME, { keyPath: 'groupId' });
+      }
       
       // 版本2：创建设置对象存储
       if (oldVersion < 2 && newVersion >= 2) {
@@ -90,8 +97,8 @@ async function initDB() {
     console.log('[initDB] 对象存储:', Array.from(dbInstance.objectStoreNames).join(', '));
     
     // 检查关键对象存储是否存在，如果不存在则强制升级
-    if (!dbInstance.objectStoreNames.contains(STORE_NAME)) {
-      console.warn('[initDB] ⚠️ 检测到 links 对象存储不存在，强制重建数据库');
+    if (!dbInstance.objectStoreNames.contains(STORE_NAME) || !dbInstance.objectStoreNames.contains(GROUPS_STORE_NAME)) {
+      console.warn('[initDB] ⚠️ 检测到对象存储不存在，强制重建数据库');
       dbInstance.close();
       dbInstance = null;
       
@@ -118,6 +125,12 @@ async function initDB() {
           store.createIndex('url', 'url', { unique: true });
           store.createIndex('timestamp', 'timestamp');
         }
+        // 确保创建分组对象存储
+        if (!db.objectStoreNames.contains(GROUPS_STORE_NAME)) {
+          console.log(`[initDB] 创建对象存储: ${GROUPS_STORE_NAME}`);
+          db.createObjectStore(GROUPS_STORE_NAME, { keyPath: 'groupId' });
+        }
+        
         
         // 确保创建设置对象存储
         if (!db.objectStoreNames.contains('settings')) {
@@ -137,6 +150,286 @@ async function initDB() {
     console.error('[initDB] 数据库初始化失败:', error);
     dbInstance = null;
     throw error;
+  }
+}
+
+/**
+ * 加载所有分组
+ * @returns {Promise<Array>} 分组数组
+ */
+export async function loadGroups() {
+  try {
+    const db = await initDB();
+    if (!db.objectStoreNames.contains(GROUPS_STORE_NAME)) {
+      console.warn('groups对象存储不存在，返回空数组');
+      return [];
+    }
+    const store = getStore(db, GROUPS_STORE_NAME, 'readonly');
+    return await getAll(store);
+  } catch (error) {
+    console.warn('loadGroups失败:', error);
+    return [];
+  }
+}
+
+/**
+ * 导出所有分组
+ * @returns {Promise<Array>} 分组数组
+ */
+export async function exportGroups() {
+  return await loadGroups();
+}
+
+/**
+ * 批量导入分组
+ * @param {Array<Object>} groups 分组数组
+ * @returns {Promise<{imported: number, skipped: number}>} 导入结果
+ */
+export async function importGroups(groups) {
+  if (!Array.isArray(groups) || groups.length === 0) {
+    return { imported: 0, skipped: 0 };
+  }
+
+  let imported = 0;
+  let skipped = 0;
+
+  for (const group of groups) {
+    try {
+      // 验证必要字段
+      if (!group.groupId || !group.groupName) {
+        skipped++;
+        continue;
+      }
+
+      // 检查是否已存在
+      const existing = await get(await initDB().then(db => getStore(db, GROUPS_STORE_NAME, 'readonly')), group.groupId);
+
+      if (existing) {
+        // 更新现有分组
+        await updateGroup(group.groupId, {
+          groupName: group.groupName,
+          order: group.order,
+          linkIds: group.linkIds || []
+        });
+      } else {
+        // 添加新分组
+        await addGroup({
+          groupId: group.groupId,
+          groupName: group.groupName,
+          order: group.order || 0,
+          linkIds: group.linkIds || []
+        });
+      }
+      imported++;
+    } catch (error) {
+      console.error('导入分组失败:', error);
+      skipped++;
+    }
+  }
+
+  return { imported, skipped };
+}
+
+/**
+ * 新增分组
+ * @param {Object} group 分组对象，需包含 groupId, groupName, order, urls
+ * @returns {Promise<void>}
+ */
+export async function addGroup(group) {
+  const db = await initDB();
+  const store = getStore(db, GROUPS_STORE_NAME, 'readwrite');
+  await add(store, group);
+}
+
+/**
+ * 更新分组
+ * @param {string} groupId 分组ID
+ * @param {Object} updates 更新内容
+ * @returns {Promise<void>}
+ */
+export async function updateGroup(groupId, updates) {
+  const db = await initDB();
+  const store = getStore(db, GROUPS_STORE_NAME, 'readwrite');
+  const group = await get(store, groupId);
+  if (!group) throw new Error('分组不存在');
+  const newGroup = { ...group, ...updates };
+  await put(store, newGroup);
+}
+
+/**
+ * 批量更新分组顺序
+ * @param {Array<{groupId: string, order: number}>} orders 新的顺序数组
+ * @returns {Promise<void>}
+ */
+export async function reorderGroups(orders) {
+  const db = await initDB();
+  const store = getStore(db, GROUPS_STORE_NAME, 'readwrite');
+  const groups = await getAll(store);
+
+  for (const { groupId, order } of orders) {
+    const group = groups.find(g => g.groupId === groupId);
+    if (group) {
+      group.order = order;
+      await put(store, group);
+    }
+  }
+}
+
+/**
+ * 批量更新组内链接顺序
+ * @param {string} groupId 分组ID
+ * @param {Array<number>} linkIds 新的链接ID顺序数组
+ * @returns {Promise<void>}
+ */
+export async function reorderGroupLinks(groupId, linkIds) {
+  const db = await initDB();
+  const store = getStore(db, GROUPS_STORE_NAME, 'readwrite');
+  const group = await get(store, groupId);
+
+  if (!group) throw new Error('分组不存在');
+  group.linkIds = linkIds;
+  await put(store, group);
+}
+
+/**
+ * 删除分组
+ * @param {string} groupId 分组ID
+ * @returns {Promise<void>}
+ */
+export async function deleteGroup(groupId) {
+  const db = await initDB();
+  const store = getStore(db, GROUPS_STORE_NAME, 'readwrite');
+  await del(store, groupId);
+}
+
+// ==================== 分组引用关联方法 ====================
+
+/**
+ * 添加链接到分组（引用关联）
+ * @param {string} groupId 分组ID
+ * @param {number} linkId 主收藏夹链接的ID
+ * @returns {Promise<void>}
+ */
+export async function addLinkToGroup(groupId, linkId) {
+  const db = await initDB();
+  const store = getStore(db, GROUPS_STORE_NAME, 'readwrite');
+
+  const group = await get(store, groupId);
+  if (!group) throw new Error('分组不存在');
+
+  // 初始化 linkIds 数组
+  if (!group.linkIds) {
+    group.linkIds = [];
+  }
+
+  // 避免重复添加
+  if (!group.linkIds.includes(linkId)) {
+    group.linkIds.push(linkId);
+    await put(store, group);
+  }
+}
+
+/**
+ * 从分组移除链接
+ * @param {string} groupId 分组ID
+ * @param {number} linkId 主收藏夹链接的ID
+ * @param {boolean} deleteSource 是否同时删除主收藏夹链接（默认 false，仅移除引用）
+ * @returns {Promise<void>}
+ */
+export async function removeLinkFromGroup(groupId, linkId, deleteSource = false) {
+  const db = await initDB();
+  const store = getStore(db, GROUPS_STORE_NAME, 'readwrite');
+
+  const group = await get(store, groupId);
+  if (!group) throw new Error('分组不存在');
+
+  if (group.linkIds) {
+    group.linkIds = group.linkIds.filter(id => id !== linkId);
+    await put(store, group);
+  }
+
+  // 如果 deleteSource 为 true，同时删除主收藏夹链接
+  if (deleteSource) {
+    await deleteLink(linkId);
+  }
+}
+
+/**
+ * 获取分组内所有链接的详情（关联查询）
+ * @param {string} groupId 分组ID
+ * @returns {Promise<Array>} 链接详情数组
+ */
+export async function getGroupLinks(groupId) {
+  const db = await initDB();
+
+  // 获取分组
+  const groupsStore = getStore(db, GROUPS_STORE_NAME, 'readonly');
+  const group = await get(groupsStore, groupId);
+
+  if (!group || !group.linkIds || group.linkIds.length === 0) {
+    return [];
+  }
+
+  // 获取所有链接详情
+  const linksStore = getStore(db, STORE_NAME, 'readonly');
+  const allLinks = await getAll(linksStore);
+
+  // 过滤出组内引用的链接，并保持 linkIds 的顺序
+  const groupLinks = [];
+  for (const linkId of group.linkIds) {
+    const link = allLinks.find(l => l.id === linkId);
+    if (link) {
+      groupLinks.push({
+        id: link.id,
+        title: link.title,
+        url: link.url,
+        tags: parseTags(link.tags),
+        timestamp: link.timestamp,
+        pinned: link.pinned || false
+      });
+    }
+    // 如果链接已被删除，引用仍然保留（可选：清理无效引用）
+  }
+
+  return groupLinks;
+}
+
+/**
+ * 更新分组内链接（同步到主收藏夹）
+ * @param {string} groupId 分组ID
+ * @param {number} linkId 主收藏夹链接的ID
+ * @param {Object} updates 要更新的字段 {title, url, tags}
+ * @returns {Promise<void>}
+ */
+export async function updateGroupLink(groupId, linkId, updates) {
+  const db = await initDB();
+
+  // 验证分组是否存在该引用
+  const groupsStore = getStore(db, GROUPS_STORE_NAME, 'readonly');
+  const group = await get(groupsStore, groupId);
+
+  if (!group) throw new Error('分组不存在');
+  if (!group.linkIds || !group.linkIds.includes(linkId)) {
+    throw new Error('分组中不存在该链接');
+  }
+
+  // 更新主收藏夹中的链接
+  await updateLink(linkId, updates);
+}
+
+/**
+ * 清理分组中已失效的链接引用
+ * （当主收藏夹链接被删除时调用）
+ * @param {number} deletedLinkId 已删除的链接ID
+ * @returns {Promise<void>}
+ */
+export async function cleanGroupLinkRefs(deletedLinkId) {
+  const groups = await loadGroups();
+
+  for (const group of groups) {
+    if (group.linkIds && group.linkIds.includes(deletedLinkId)) {
+      await removeLinkFromGroup(group.groupId, deletedLinkId);
+    }
   }
 }
 
@@ -326,6 +619,8 @@ export async function deleteLink(id) {
     const db = await initDB();
     const store = getStore(db, STORE_NAME, 'readwrite');
     await del(store, id);
+    // 清理分组中的该链接引用
+    await cleanGroupLinkRefs(id);
   } catch (error) {
     console.error('删除链接失败:', error);
     throw error;
@@ -461,6 +756,11 @@ export async function batchAddLinks(links) {
           tags: tagsArrayToString(link.tags), // 兼容数组和字符串格式（包括中文逗号）
           timestamp: link.timestamp || new Date().toISOString()
         };
+
+        // 调试日志
+        if (i < 3) {
+          console.log(`[batchAddLinks] 第 ${i + 1} 条原始timestamp:`, link.timestamp, '-> 保存的timestamp:', linkData.timestamp);
+        }
         
         try {
           if (i < 3) {
