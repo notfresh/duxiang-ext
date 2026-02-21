@@ -192,6 +192,7 @@ function renderGroups(groups) {
         <span class="group-count">${group.linkIds ? group.linkIds.length : 0} 个链接</span>
       </div>
       <div class="group-actions" onclick="event.stopPropagation()">
+        <button class="action-btn open-all" data-action="open-all" title="批量打开">▶</button>
         <button class="action-btn move-up" data-action="move-up" title="上移" ${index === 0 ? 'disabled' : ''}>↑</button>
         <button class="action-btn move-down" data-action="move-down" title="下移" ${index === sortedGroups.length - 1 ? 'disabled' : ''}>↓</button>
         <button class="action-btn edit" data-action="edit" title="编辑">✎</button>
@@ -222,6 +223,30 @@ function renderGroups(groups) {
       e.stopPropagation();
       const groupId = e.target.closest('.group-card').dataset.groupId;
       confirmDeleteGroup(groupId);
+    });
+  });
+
+  // 绑定批量打开按钮事件
+  container.querySelectorAll('.action-btn.open-all').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const groupId = e.target.closest('.group-card').dataset.groupId;
+      // 批量打开该分组的链接
+      try {
+        const links = await getGroupLinks(groupId);
+        if (links.length === 0) {
+          showStatus('分组内没有链接', true);
+          return;
+        }
+        // 逐个打开链接
+        for (const link of links) {
+          chrome.tabs.create({ url: link.url, active: false });
+        }
+        showStatus(`已打开 ${links.length} 个链接`);
+      } catch (error) {
+        console.error('批量打开失败:', error);
+        showStatus('打开失败: ' + error.message, true);
+      }
     });
   });
 
@@ -366,6 +391,10 @@ function navigateToGroup(groupId) {
 backBtn.addEventListener('click', () => {
   window.location.href = 'group.html';
 });
+
+// 检测是否从快捷键打开
+const urlParams = new URLSearchParams(window.location.search);
+const fromShortcut = urlParams.get('from') === 'shortcut';
 
 // 返回主页
 homeBtn.addEventListener('click', () => {
@@ -719,6 +748,14 @@ function escapeHtml(text) {
   div.textContent = text;
   return div.innerHTML;
 }
+
+// 按ESC键关闭窗口
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    console.log('按下ESC键，关闭窗口');
+    window.close();
+  }
+});
 
 // 启动
 init();

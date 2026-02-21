@@ -3,6 +3,10 @@ console.log('[background] ========== Service Worker 已启动 ==========');
 console.log('[background] 时间:', new Date().toISOString());
 console.log('[background] 扩展 ID:', chrome.runtime.id);
 
+// 弹窗尺寸常量
+const POPUP_WIDTH = 400;
+const POPUP_HEIGHT = 600;
+
 // 监听安装事件
 chrome.runtime.onInstalled.addListener((details) => {
   console.log('[background] 扩展安装/更新:', details.reason);
@@ -32,26 +36,26 @@ chrome.commands.onCommand.addListener((command) => {
                 console.error('[background] 查询标签页失败:', chrome.runtime.lastError);
                 return;
             }
-            
+
             if (tabs.length === 0) {
                 console.error('[background] 无法获取当前标签页信息');
                 return;
             }
-            
+
             const currentTab = tabs[0];
             console.log('[background] 当前标签页:', currentTab.url, currentTab.title);
             const url = encodeURIComponent(currentTab.url);
             const title = encodeURIComponent(currentTab.title);
-            
+
             chrome.windows.getCurrent((currentWindow) => {
                 if (chrome.runtime.lastError) {
                     console.error('[background] 获取当前窗口失败:', chrome.runtime.lastError);
                     return;
                 }
-                
-                const popupWidth = 400;
-                const popupHeight = 380; // 稍微增加高度以适应更多内容
-                
+
+                const popupWidth = POPUP_WIDTH;
+                const popupHeight = POPUP_HEIGHT;
+
                 const left = Math.round(currentWindow.left + (currentWindow.width - popupWidth) / 2);
                 const top = Math.round(currentWindow.top + (currentWindow.height - popupHeight) / 2);
 
@@ -71,6 +75,21 @@ chrome.commands.onCommand.addListener((command) => {
                     }
                 });
             });
+        });
+    } else if (command === 'open_groups') {
+        console.log('[background] 开始处理打开分组管理命令');
+        // 快捷键打开的弹窗有标题栏，高度需要增加
+        chrome.windows.create({
+            url: 'group.html?from=shortcut',
+            type: 'popup',
+            width: POPUP_WIDTH,
+            height: POPUP_HEIGHT + 50
+        }, (window) => {
+            if (chrome.runtime.lastError) {
+                console.error('[background] 创建分组管理弹窗失败:', chrome.runtime.lastError);
+            } else {
+                console.log('[background] 分组管理弹窗已创建，窗口ID:', window.id);
+            }
         });
     }
 });

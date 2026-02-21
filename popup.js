@@ -1,7 +1,7 @@
 // 导入模块
 import { showStatus, log, tagsArrayToString } from './js/utils.js';
 import { renderLinks, showEmptyState, showSearchEmptyState } from './js/render.js';
-import { loadLinks, deleteLink as deleteLinkFromStorage, updateLink, exportLinks, batchAddLinks, togglePinLink, clearDatabase as clearDatabaseFromStorage, addLink } from './js/storage.js';
+import { loadLinks, loadGroups, deleteLink as deleteLinkFromStorage, updateLink, exportLinks, batchAddLinks, togglePinLink, clearDatabase as clearDatabaseFromStorage, addLink } from './js/storage.js';
 import { importBookmarks } from './js/bookmarks.js';
 import { setupSearch } from './js/search.js';
 import { loadSettings, saveSettings, updateCompactModeSettings } from './js/settings.js';
@@ -47,6 +47,8 @@ document.addEventListener('DOMContentLoaded', function() {
   const urlMaxCharsInput = document.getElementById('urlMaxCharsInput');
   const settingsCancelBtn = document.getElementById('settingsCancelBtn');
   const settingsSaveBtn = document.getElementById('settingsSaveBtn');
+  const linkCountSpan = document.getElementById('linkCountSpan');
+  const groupCountSpan = document.getElementById('groupCountSpan');
   
   // 状态管理
   let isDebugMode = false;
@@ -143,7 +145,6 @@ document.addEventListener('DOMContentLoaded', function() {
           updateSearchFn(loadedLinks);
         }
         
-        showStatusMessage(`已加载 ${loadedLinks.length} 条链接`);
         console.log('[loadLinksFromStorage] 加载完成');
       } catch (error) {
         console.error('[loadLinksFromStorage] 渲染链接时出错:', error.name, error.message, error.stack);
@@ -381,10 +382,17 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
   
-  // ESC 键关闭对话框
+  // ESC 键关闭对话框或整个弹窗
   document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape' && editDialogOverlay.classList.contains('show')) {
-      hideEditDialog();
+    if (e.key === 'Escape') {
+      if (editDialogOverlay.classList.contains('show')) {
+        hideEditDialog();
+      } else if (settingsDialogOverlay.classList.contains('show')) {
+        hideSettingsDialog();
+      } else {
+        // 没有对话框打开时，关闭整个弹窗
+        window.close();
+      }
     }
   });
   
@@ -773,9 +781,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!currentSettings) {
       return;
     }
-    
+
     const compactMode = currentSettings.compactMode || {};
-    
+
     // 填充当前设置值
     compactModeCheckbox.checked = compactMode.enabled || false;
     showUrlCheckbox.checked = compactMode.showUrl !== false; // 默认为 true
@@ -783,9 +791,33 @@ document.addEventListener('DOMContentLoaded', function() {
     showTagsCheckbox.checked = compactMode.showTags !== false; // 默认为 true
     titleMaxCharsInput.value = compactMode.titleMaxChars || 0;
     urlMaxCharsInput.value = compactMode.urlMaxChars || 0;
-    
+
+    // 加载并显示统计信息
+    loadAndShowStats();
+
     // 显示对话框
     settingsDialogOverlay.classList.add('show');
+  }
+
+  // 加载并显示统计信息
+  async function loadAndShowStats() {
+    try {
+      // 获取链接数量
+      const links = await loadLinks();
+      const linkCount = links ? links.length : 0;
+
+      // 获取分组数量
+      const groups = await loadGroups();
+      const groupCount = groups ? groups.length : 0;
+
+      // 更新显示
+      if (linkCountSpan) linkCountSpan.textContent = linkCount;
+      if (groupCountSpan) groupCountSpan.textContent = groupCount;
+    } catch (error) {
+      console.error('加载统计信息失败:', error);
+      if (linkCountSpan) linkCountSpan.textContent = '-';
+      if (groupCountSpan) groupCountSpan.textContent = '-';
+    }
   }
   
   /**
@@ -854,7 +886,6 @@ document.addEventListener('DOMContentLoaded', function() {
   // 绑定分组管理按钮事件
   const groupsBtn = document.getElementById('groupsBtn');
   groupsBtn.addEventListener('click', function() {
-    // 打开分组管理页面
     window.location.href = 'group.html';
   });
 
@@ -869,14 +900,7 @@ document.addEventListener('DOMContentLoaded', function() {
       hideSettingsDialog();
     }
   });
-  
-  // ESC 键关闭设置对话框
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape' && settingsDialogOverlay.classList.contains('show')) {
-      hideSettingsDialog();
-    }
-  });
-  
+
   // ========== 设置功能结束 ==========
   
   // 清除所有数据

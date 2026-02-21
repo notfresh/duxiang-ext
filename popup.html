@@ -23,7 +23,7 @@
     body {
       display: flex;
       flex-direction: column;
-      max-height: 600px; /* 限制最大高度，避免超出浏览器窗口 */
+      max-height: 600px;
     }
     
     h1 {
@@ -39,6 +39,7 @@
       display: flex;
       justify-content: center;
       gap: 10px;
+      margin-top: auto;
       margin-bottom: 10px;
       background-color: #f5f5f5;
       padding: 0 0 10px 0;
@@ -659,7 +660,9 @@
   <!-- 快捷键配置提示 -->
   <div id="shortcutTip" class="shortcut-tip" style="display: none;">
     <div class="shortcut-tip-content">
-      <p>💡 提示：配置快捷键后，按 <strong>Shift+Alt+S</strong> 即可快速保存当前页面</p>
+      <p>💡 提示：配置快捷键后，可快速操作</p>
+      <p style="margin: 8px 0;"><strong>Shift+Alt+S</strong> 快速保存当前页面</p>
+      <p style="margin: 0 0 12px 0;"><strong>Shift+Alt+G</strong> 打开分组管理</p>
       <button id="configureShortcutBtn" class="shortcut-config-btn">配置快捷键</button>
       <button id="dismissShortcutTipBtn" class="shortcut-dismiss-btn">不再提示</button>
     </div>
@@ -728,6 +731,13 @@
           <label for="urlMaxCharsInput" style="display: block; margin-bottom: 4px; font-size: 13px; color: #666;">URL最大字符数：</label>
           <input type="number" id="urlMaxCharsInput" min="0" value="0" style="width: 100px; padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;">
           <span style="font-size: 12px; color: #999; margin-left: 8px;">（0表示不限制）</span>
+        </div>
+      </div>
+      <div class="input-group" style="margin-top: 15px;">
+        <label style="font-size: 14px; color: #555; font-weight: 500; margin-bottom: 8px; display: block;">统计信息：</label>
+        <div id="statsInfo" style="font-size: 13px; color: #666; margin-bottom: 8px;">
+          <p style="margin: 4px 0;">链接总数：<span id="linkCountSpan">-</span></p>
+          <p style="margin: 4px 0;">分组数量：<span id="groupCountSpan">-</span></p>
         </div>
       </div>
       <div class="input-group" style="margin-top: 15px;">

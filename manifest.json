@@ -28,6 +28,12 @@
           "default": "Shift+Alt+S"
         },
         "description": "收藏当前Tab网址"
+      },
+      "open_groups": {
+        "suggested_key": {
+          "default": "Shift+Alt+G"
+        },
+        "description": "打开分组管理页面"
       }
     },
     "icons": {
