@@ -133,13 +133,13 @@ function showGroupsListView() {
 
 // 显示组内视图
 function showGroupView() {
-  document.querySelector('h1').textContent = '组内链接';
   backBtn.style.display = 'block';
   homeBtn.style.display = 'none';
   openAllBtn.style.display = 'block';
   addLinkBtn.style.display = 'block';
   searchContainer.style.display = 'block';
   addGroupBtn.style.display = 'none';
+  // 标题在 loadGroupLinks 中根据分组名设置
 }
 
 // 显示状态消息
@@ -293,6 +293,13 @@ async function loadGroupLinks() {
     const links = await getGroupLinks(currentGroupId);
     filteredLinks = links;
     renderGroupLinks(links);
+
+    // 获取分组信息，更新标题
+    const groups = await loadGroups();
+    const group = groups.find(g => g.groupId === currentGroupId);
+    if (group) {
+      document.querySelector('h1').textContent = group.groupName;
+    }
   } catch (error) {
     console.error('加载组内链接失败:', error);
     showStatus('加载链接失败: ' + error.message, true);
