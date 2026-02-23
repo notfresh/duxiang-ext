@@ -7,10 +7,11 @@ import { openDB, getStore, add, get, getAll, put, del, deleteDB } from './idb.js
 import { parseTags, tagsArrayToString } from './utils.js';
 
 const DB_NAME = 'readingLinks';
-const DB_VERSION = 2; // 使用版本 2，避免升级阻塞问题
+const DB_VERSION = 3; // 使用版本 3
 
 const STORE_NAME = 'links';
 const GROUPS_STORE_NAME = 'groups'; // 新增分组对象存储
+const SELECTIONS_STORE_NAME = 'selections'; // 存储页面选中文本
 
 let dbInstance = null;
 
@@ -76,6 +77,12 @@ async function initDB() {
           console.log('[initDB] 创建对象存储: settings');
           db.createObjectStore('settings', { keyPath: 'key' });
         }
+      }
+
+      // 创建选中文本对象存储（如果不存在）
+      if (!db.objectStoreNames.contains(SELECTIONS_STORE_NAME)) {
+        console.log(`[initDB] 创建对象存储: ${SELECTIONS_STORE_NAME}`);
+        db.createObjectStore(SELECTIONS_STORE_NAME, { keyPath: 'url' });
       }
       
       // 如果存在 tabGroups 对象存储，尝试删除（不强制，避免升级问题）
@@ -958,6 +965,148 @@ export async function clearDatabase() {
     console.log('[clearDatabase] 数据库删除成功');
   } catch (error) {
     console.error('[clearDatabase] 删除数据库失败:', error);
+    throw error;
+  }
+}
+
+// ==================== 选中文本存储方法 ====================
+
+/**
+ * 保存选中的文本到指定URL
+ * @param {string} url - 页面URL
+ * @param {string} text - 选中的文本内容
+ * @returns {Promise<void>}
+ */
+export async function saveSelection(url, text) {
+  if (!url || !text || !text.trim()) {
+    console.warn('[saveSelection] URL或文本为空，跳过保存');
+    return;
+  }
+
+  try {
+    const db = await initDB();
+    const store = getStore(db, SELECTIONS_STORE_NAME, 'readwrite');
+
+    // 获取现有数据
+    const existing = await get(store, url);
+
+    const newSelection = {
+      text: text.trim(),
+      time: new Date().toISOString()
+    };
+
+    if (existing && existing.selections) {
+      // 追加到现有数组
+      existing.selections.push(newSelection);
+      await put(store, existing);
+      console.log(`[saveSelection] 已追加选中文本，当前共有 ${existing.selections.length} 条`);
+    } else {
+      // 新建记录
+      await put(store, {
+        url: url,
+        title: '', // 可选：页面标题
+        selections: [newSelection]
+      });
+      console.log('[saveSelection] 已保存第一条选中文本');
+    }
+  } catch (error) {
+    console.error('[saveSelection] 保存选中文本失败:', error);
+    throw error;
+  }
+}
+
+/**
+ * 获取指定URL的所有选中文本
+ * @param {string} url - 页面URL
+ * @returns {Promise<Array>} 选中文本数组
+ */
+export async function getSelections(url) {
+  if (!url) {
+    return [];
+  }
+
+  try {
+    const db = await initDB();
+    const store = getStore(db, SELECTIONS_STORE_NAME, 'readonly');
+    const result = await get(store, url);
+
+    if (result && result.selections) {
+      // 按时间倒序返回
+      return result.selections.sort((a, b) => new Date(b.time) - new Date(a.time));
+    }
+    return [];
+  } catch (error) {
+    console.error('[getSelections] 获取选中文本失败:', error);
+    return [];
+  }
+}
+
+/**
+ * 获取所有页面的选中文本记录
+ * @returns {Promise<Array>} 所有选中文本记录
+ */
+export async function getAllSelections() {
+  try {
+    const db = await initDB();
+    const store = getStore(db, SELECTIONS_STORE_NAME, 'readonly');
+    const all = await getAll(store);
+
+    return all.map(item => ({
+      url: item.url,
+      title: item.title || '',
+      selections: item.selections || [],
+      count: (item.selections || []).length
+    })).sort((a, b) => b.count - a.count); // 按数量倒序
+  } catch (error) {
+    console.error('[getAllSelections] 获取所有选中文本失败:', error);
+    return [];
+  }
+}
+
+/**
+ * 删除指定URL的选中文本记录
+ * @param {string} url - 页面URL
+ * @returns {Promise<void>}
+ */
+export async function deleteSelections(url) {
+  if (!url) {
+    return;
+  }
+
+  try {
+    const db = await initDB();
+    const store = getStore(db, SELECTIONS_STORE_NAME, 'readwrite');
+    await del(store, url);
+    console.log('[deleteSelections] 已删除选中文本记录:', url);
+  } catch (error) {
+    console.error('[deleteSelections] 删除选中文本失败:', error);
+    throw error;
+  }
+}
+
+/**
+ * 删除指定URL的某一条选中文本
+ * @param {string} url - 页面URL
+ * @param {number} index - 要删除的索引
+ * @returns {Promise<void>}
+ */
+export async function deleteSelectionByIndex(url, index) {
+  if (!url || typeof index !== 'number') {
+    return;
+  }
+
+  try {
+    const db = await initDB();
+    const store = getStore(db, SELECTIONS_STORE_NAME, 'readwrite');
+    const existing = await get(store, url);
+
+    if (existing && existing.selections && existing.selections[index]) {
+      existing.selections.splice(index, 1);
+      await put(store, existing);
+      console.log(`[deleteSelectionByIndex] 已删除第 ${index} 条选中文本`);
+    }
+  } catch (error) {
+    console.error('[deleteSelectionByIndex] 删除选中文本失败:', error);
     throw error;
   }
 }

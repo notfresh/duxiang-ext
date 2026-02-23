@@ -644,6 +644,152 @@
       height: 20px;           /* 从24px减少到20px */
       font-size: 12px;        /* 按钮图标稍小 */
     }
+
+    /* ========== 选中文本视图样式 ========== */
+    .selection-page-card {
+      background-color: #f9f9f9;
+      border-left: 4px solid #2196F3;
+      padding: 12px;
+      margin-bottom: 10px;
+      transition: box-shadow 0.2s;
+    }
+
+    .selection-page-card:hover {
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+
+    .selection-page-url {
+      font-weight: bold;
+      font-size: 14px;
+      color: #333;
+      margin-bottom: 8px;
+      word-break: break-all;
+      cursor: pointer;
+    }
+
+    .selection-page-url:hover {
+      color: #2a7ae2;
+      text-decoration: underline;
+    }
+
+    .selection-count {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 8px;
+    }
+
+    .selection-item {
+      background-color: white;
+      border: 1px solid #eee;
+      padding: 8px;
+      margin-bottom: 6px;
+      border-radius: 4px;
+      font-size: 13px;
+      position: relative;
+    }
+
+    .selection-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .selection-text {
+      word-break: break-word;
+      white-space: pre-wrap;
+      margin-bottom: 6px;
+      max-height: 80px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      cursor: pointer;
+    }
+
+    .selection-text.expanded {
+      max-height: none;
+    }
+
+    .selection-text:hover {
+      background-color: #f5f5f5;
+    }
+
+    /* selectionsContainer 滚动样式 */
+    #selectionsContainer {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-right: 5px;
+    }
+
+    #selectionsContainer::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    #selectionsContainer::-webkit-scrollbar-track {
+      background: #f1f1f1;
+    }
+
+    #selectionsContainer::-webkit-scrollbar-thumb {
+      background: #888;
+      border-radius: 4px;
+    }
+
+    #selectionsContainer::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
+
+    .selection-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: #999;
+    }
+
+    .selection-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .selection-action-btn {
+      background: transparent;
+      border: none;
+      color: #999;
+      cursor: pointer;
+      font-size: 12px;
+      padding: 2px 4px;
+    }
+
+    .selection-action-btn:hover {
+      color: #333;
+    }
+
+    .selection-action-btn.delete:hover {
+      color: #f44336;
+    }
+
+    .selection-action-btn.copy:hover {
+      color: #4CAF50;
+    }
+
+    .expand-btn {
+      background: transparent;
+      border: none;
+      color: #2196F3;
+      cursor: pointer;
+      font-size: 12px;
+      padding: 2px 4px;
+    }
+
+    .back-btn {
+      background-color: #f5f5f5;
+      border: 1px solid #ddd;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .back-btn:hover {
+      background-color: #e0e0e0;
+    }
   </style>
 </head>
 <body>
@@ -677,11 +823,25 @@
     </div>
   </div>
 
+  <!-- 选中文本视图 -->
+  <div id="selectionsView" style="display: none; flex-direction: column; height: 100%;">
+    <div class="header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-shrink: 0;">
+      <button id="backFromSelectionsBtn" class="back-btn">← 返回</button>
+      <span id="selectionsTitle">选中文本</span>
+    </div>
+    <div id="selectionsContainer" style="flex: 1; overflow-y: auto; overflow-x: hidden;">
+      <div class="empty-state">
+        <p>暂无保存的选中文本</p>
+        <p>在网页上选中文字后，按 Shift+Alt+C 保存</p>
+      </div>
+    </div>
+  </div>
+
   <div class="controls">
     <button id="addBtn">新增</button>
-    <button id="importBookmarksBtn">导入系统收藏夹</button>
     <button id="exportBtn">导出</button>
     <button id="groupsBtn">分组管理</button>
+    <button id="selectionsBtn">选中文本</button>
     <button id="settingsBtn">设置</button>
   </div>
   <!-- 快捷键配置提示 -->
@@ -772,10 +932,11 @@
       <div class="input-group" style="margin-top: 15px;">
         <label style="font-size: 14px; color: #555; font-weight: 500; margin-bottom: 8px; display: block;">数据管理：</label>
         <div style="margin-bottom: 8px;">
-          <button id="settingsImportBtn" style="background-color: #2196F3; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; margin-right: 8px;">导入</button>
+          <button id="settingsImportBtn" style="background-color: #2196F3; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; margin-right: 8px;">导入JSON</button>
           <button id="settingsExportBtn" style="background-color: #2196F3; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 13px;">导出</button>
+          <button id="settingsImportBookmarksBtn" style="background-color: #FF9800; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; margin-left: 8px;">导入系统收藏夹</button>
         </div>
-        <p style="font-size: 12px; color: #999; margin: 0;">导入JSON文件，导出当前所有收藏</p>
+        <p style="font-size: 12px; color: #999; margin: 0;">导入JSON文件或从浏览器系统收藏夹导入</p>
       </div>
       <div class="button-group" style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee;">
         <button id="clearDataBtn" style="background-color: #f44336; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px; margin-right: 10px;">清除数据</button>

@@ -9,13 +9,17 @@
         "commands",
         "tabs",
         "storage",
-        "bookmarks"
+        "bookmarks",
+        "contextMenus",
+        "notifications"
     ],
     "background": {
       "service_worker": "background.js"
     },
     "action": {
       "default_popup": "popup.html",
+      "default_width": 400,
+      "default_height": 650,
       "default_icon": {
         "16": "icons/octpus_blue_16.png",
         "48": "icons/octpus_blue_48.png",
@@ -34,6 +38,18 @@
           "default": "Shift+Alt+G"
         },
         "description": "打开分组管理页面"
+      },
+      "open_selections": {
+        "suggested_key": {
+          "default": "Shift+Alt+K"
+        },
+        "description": "打开选中文本页面"
+      },
+      "save_selection": {
+        "suggested_key": {
+          "default": "Shift+Alt+X"
+        },
+        "description": "保存当前页面选中的文本"
       }
     },
     "icons": {

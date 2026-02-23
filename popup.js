@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // 获取DOM元素
   const linksContainer = document.getElementById('linksContainer');
   const addBtn = document.getElementById('addBtn');
-  const importBookmarksBtn = document.getElementById('importBookmarksBtn');
+  const importBookmarksBtn = document.getElementById('settingsImportBookmarksBtn');
   const jsonFileInput = document.getElementById('jsonFileInput');
   const exportBtn = document.getElementById('exportBtn');
   const settingsImportBtn = document.getElementById('settingsImportBtn');
@@ -168,7 +168,14 @@ document.addEventListener('DOMContentLoaded', function() {
       loadedLinks = []; // 重置为空数组
     }
   }
-  
+
+  // HTML转义函数
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
   // 渲染链接列表（支持搜索过滤）
   function renderLinksList(links) {
     renderLinks(
@@ -993,6 +1000,13 @@ document.addEventListener('DOMContentLoaded', function() {
   const groupsBtn = document.getElementById('groupsBtn');
   groupsBtn.addEventListener('click', function() {
     window.location.href = 'group.html';
+  });
+
+  // 选中文本按钮
+  const selectionsBtn = document.getElementById('selectionsBtn');
+  selectionsBtn.addEventListener('click', () => {
+    // 使用内部导航加载 selections 页面（保持与 group.html 一致的 in-popup 行为）
+    window.location.href = 'selections.html';
   });
 
   // 绑定设置对话框事件
