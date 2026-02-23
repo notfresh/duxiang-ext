@@ -135,6 +135,19 @@
       text-decoration: underline;
     }
     
+    /* 归档按钮样式 */
+    .archive-btn {
+      background-color: transparent;
+      color: #999;
+      border: none;
+      font-size: 16px;
+      cursor: pointer;
+      padding: 2px 4px;
+    }
+    .archive-btn:hover {
+      color: #666;
+    }
+
     /* 删除按钮样式 */
     .delete-btn {
       background-color: transparent;
@@ -650,6 +663,20 @@
       <p>使用快捷键 Shift+Alt+S 添加当前页面到阅读列表</p>
     </div>
   </div>
+
+  <!-- 归档视图 -->
+  <div id="archivedView" style="display: none;">
+    <div class="header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+      <button id="backFromArchivedBtn" class="back-btn">← 返回</button>
+      <span></span>
+    </div>
+    <div id="archivedContainer">
+      <div class="empty-state">
+        <p>暂无已归档的链接</p>
+      </div>
+    </div>
+  </div>
+
   <div class="controls">
     <button id="addBtn">新增</button>
     <button id="importBookmarksBtn">导入系统收藏夹</button>
@@ -738,7 +765,9 @@
         <div id="statsInfo" style="font-size: 13px; color: #666; margin-bottom: 8px;">
           <p style="margin: 4px 0;">链接总数：<span id="linkCountSpan">-</span></p>
           <p style="margin: 4px 0;">分组数量：<span id="groupCountSpan">-</span></p>
+          <p style="margin: 4px 0;">已归档：<span id="archivedCountSpan">-</span></p>
         </div>
+        <button id="viewArchivedBtn" style="background-color: #FF9800; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 13px;">查看已归档</button>
       </div>
       <div class="input-group" style="margin-top: 15px;">
         <label style="font-size: 14px; color: #555; font-weight: 500; margin-bottom: 8px; display: block;">数据管理：</label>

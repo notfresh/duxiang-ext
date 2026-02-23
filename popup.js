@@ -1,7 +1,7 @@
 // 导入模块
-import { showStatus, log, tagsArrayToString } from './js/utils.js';
+import { showStatus, log, tagsArrayToString, formatDate } from './js/utils.js';
 import { renderLinks, showEmptyState, showSearchEmptyState } from './js/render.js';
-import { loadLinks, loadGroups, deleteLink as deleteLinkFromStorage, updateLink, exportLinks, batchAddLinks, togglePinLink, clearDatabase as clearDatabaseFromStorage, addLink } from './js/storage.js';
+import { loadLinks, loadGroups, loadArchivedLinks, archiveLink, unarchiveLink, deleteLink as deleteLinkFromStorage, updateLink, exportLinks, batchAddLinks, togglePinLink, clearDatabase as clearDatabaseFromStorage, addLink } from './js/storage.js';
 import { importBookmarks } from './js/bookmarks.js';
 import { setupSearch } from './js/search.js';
 import { loadSettings, saveSettings, updateCompactModeSettings } from './js/settings.js';
@@ -49,7 +49,12 @@ document.addEventListener('DOMContentLoaded', function() {
   const settingsSaveBtn = document.getElementById('settingsSaveBtn');
   const linkCountSpan = document.getElementById('linkCountSpan');
   const groupCountSpan = document.getElementById('groupCountSpan');
-  
+  const archivedCountSpan = document.getElementById('archivedCountSpan');
+  const viewArchivedBtn = document.getElementById('viewArchivedBtn');
+  const archivedView = document.getElementById('archivedView');
+  const archivedContainer = document.getElementById('archivedContainer');
+  const backFromArchivedBtn = document.getElementById('backFromArchivedBtn');
+
   // 状态管理
   let isDebugMode = false;
   let loadedLinks = [];
@@ -174,7 +179,10 @@ document.addEventListener('DOMContentLoaded', function() {
       handlePinLink,
       isDebugMode ? logMessage : null
     );
-    
+
+    // 渲染后添加归档按钮
+    addArchiveButtons();
+
     // 渲染后应用文本截断
     if (currentSettings) {
       const cards = linksContainer.querySelectorAll('.link-card');
@@ -183,7 +191,99 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     }
   }
-  
+
+  // 给链接卡片添加归档按钮
+  function addArchiveButtons() {
+    const cards = linksContainer.querySelectorAll('.link-card');
+    cards.forEach(card => {
+      // 检查是否已经有归档按钮
+      if (card.querySelector('.archive-btn')) return;
+
+      const linkId = card.dataset.linkId;
+      const archiveBtn = document.createElement('button');
+      archiveBtn.className = 'archive-btn';
+      archiveBtn.innerHTML = '📦';
+      archiveBtn.title = '归档';
+
+      archiveBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        try {
+          await archiveLink(parseInt(linkId));
+          showStatusMessage('已归档');
+          // 刷新列表
+          await loadLinksFromStorage();
+        } catch (error) {
+          showStatusMessage('归档失败: ' + error.message, true);
+        }
+      });
+
+      // 找到按钮容器并添加
+      const actionsContainer = card.querySelector('.card-actions');
+      if (actionsContainer) {
+        actionsContainer.insertBefore(archiveBtn, actionsContainer.firstChild);
+      }
+    });
+  }
+
+  // 渲染归档链接列表
+  function renderArchivedLinks(links) {
+    if (!links || links.length === 0) {
+      archivedContainer.innerHTML = '<div class="empty-state"><p>暂无已归档的链接</p></div>';
+      return;
+    }
+
+    archivedContainer.innerHTML = links.map(link => `
+      <div class="link-card" data-link-id="${link.id}">
+        <div class="link-content">
+          <a href="${escapeHtml(link.url)}" class="link-title" target="_blank">${escapeHtml(link.title)}</a>
+          <a href="${escapeHtml(link.url)}" class="link-url" target="_blank">${escapeHtml(link.url)}</a>
+        </div>
+        <div class="link-meta">
+          ${link.archivedAt ? `<span class="timestamp">归档于: ${formatDate(link.archivedAt)}</span>` : ''}
+        </div>
+        <div class="link-actions">
+          <button class="action-btn unarchive" data-action="unarchive" title="取消归档">↩</button>
+          <button class="action-btn delete" data-action="delete" title="删除">✕</button>
+        </div>
+      </div>
+    `).join('');
+
+    // 绑定事件
+    archivedContainer.querySelectorAll('.action-btn.unarchive').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const linkId = parseInt(e.target.closest('.link-card').dataset.linkId);
+        try {
+          await unarchiveLink(linkId);
+          showStatusMessage('已取消归档');
+          // 刷新归档列表
+          const archivedLinks = await loadArchivedLinks();
+          renderArchivedLinks(archivedLinks);
+        } catch (error) {
+          showStatusMessage('取消归档失败: ' + error.message, true);
+        }
+      });
+    });
+
+    archivedContainer.querySelectorAll('.action-btn.delete').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const linkId = parseInt(e.target.closest('.link-card').dataset.linkId);
+        if (confirm('确定要删除这个链接吗？此操作不可恢复。')) {
+          try {
+            await deleteLinkFromStorage(linkId);
+            showStatusMessage('链接已删除');
+            // 刷新归档列表
+            const archivedLinks = await loadArchivedLinks();
+            renderArchivedLinks(archivedLinks);
+          } catch (error) {
+            showStatusMessage('删除失败: ' + error.message, true);
+          }
+        }
+      });
+    });
+  }
+
   // 处理搜索结果
   function handleSearchResults(filteredLinks, searchText) {
     if (filteredLinks.length === 0 && searchText) {
@@ -802,21 +902,27 @@ document.addEventListener('DOMContentLoaded', function() {
   // 加载并显示统计信息
   async function loadAndShowStats() {
     try {
-      // 获取链接数量
-      const links = await loadLinks();
+      // 获取链接数量（不包含已归档的）
+      const links = await loadLinks(false);
       const linkCount = links ? links.length : 0;
 
       // 获取分组数量
       const groups = await loadGroups();
       const groupCount = groups ? groups.length : 0;
 
+      // 获取已归档数量
+      const archivedLinks = await loadArchivedLinks();
+      const archivedCount = archivedLinks ? archivedLinks.length : 0;
+
       // 更新显示
       if (linkCountSpan) linkCountSpan.textContent = linkCount;
       if (groupCountSpan) groupCountSpan.textContent = groupCount;
+      if (archivedCountSpan) archivedCountSpan.textContent = archivedCount;
     } catch (error) {
       console.error('加载统计信息失败:', error);
       if (linkCountSpan) linkCountSpan.textContent = '-';
       if (groupCountSpan) groupCountSpan.textContent = '-';
+      if (archivedCountSpan) archivedCountSpan.textContent = '-';
     }
   }
   
@@ -893,12 +999,34 @@ document.addEventListener('DOMContentLoaded', function() {
   settingsBtn.addEventListener('click', showSettingsDialog);
   settingsCancelBtn.addEventListener('click', hideSettingsDialog);
   settingsSaveBtn.addEventListener('click', saveSettingsAndApply);
-  
+
   // 点击遮罩层关闭设置对话框
   settingsDialogOverlay.addEventListener('click', function(e) {
     if (e.target === settingsDialogOverlay) {
       hideSettingsDialog();
     }
+  });
+
+  // 查看归档按钮
+  viewArchivedBtn.addEventListener('click', async () => {
+    hideSettingsDialog();
+    // 加载归档链接
+    const archivedLinks = await loadArchivedLinks();
+    console.log('[popup] 归档链接数量:', archivedLinks?.length || 0);
+    if (archivedLinks && archivedLinks.length > 0) {
+      console.log('[popup] 归档链接详情:', JSON.stringify(archivedLinks.map(l => ({id: l.id, title: l.title, archived: l.archived}))));
+    }
+    // 渲染归档列表
+    renderArchivedLinks(archivedLinks);
+    // 显示归档视图
+    linksContainer.style.display = 'none';
+    archivedView.style.display = 'block';
+  });
+
+  // 从归档返回按钮
+  backFromArchivedBtn.addEventListener('click', () => {
+    archivedView.style.display = 'none';
+    linksContainer.style.display = 'block';
   });
 
   // ========== 设置功能结束 ==========

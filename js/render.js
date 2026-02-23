@@ -18,7 +18,8 @@ import { formatDate, parseTags } from './utils.js';
 export function createLinkCard(link, index, onDelete, onEdit, onPin, onLog = null) {
   const card = document.createElement('div');
   card.className = 'link-card';
-  
+  card.dataset.linkId = link.id;
+
   // 头部区域：标题和删除按钮
   const cardHeader = document.createElement('div');
   cardHeader.className = 'card-header';

@@ -516,8 +516,8 @@ async function migrateFromChromeStorage() {
  * 加载所有链接
  * @returns {Promise<Array>} 链接数组
  */
-export async function loadLinks() {
-  console.log('[loadLinks] 开始加载链接');
+export async function loadLinks(includeArchived = false) {
+  console.log('[loadLinks] 开始加载链接, includeArchived:', includeArchived);
   try {
     console.log('[loadLinks] 初始化数据库...');
     const db = await initDB();
@@ -526,37 +526,44 @@ export async function loadLinks() {
       throw new Error('数据库连接无效');
     }
     console.log('[loadLinks] 数据库连接成功');
-    
+
     // 首次加载时尝试迁移
     console.log('[loadLinks] 检查是否需要迁移数据...');
     await migrateFromChromeStorage();
     console.log('[loadLinks] 迁移检查完成');
-    
+
     console.log('[loadLinks] 获取对象存储...');
     const store = getStore(db, STORE_NAME, 'readonly');
     console.log('[loadLinks] 从数据库读取所有链接...');
     const links = await getAll(store);
     console.log(`[loadLinks] 从数据库读取到 ${links.length} 条原始数据`);
-    
+
     // 验证和清理数据
     const validLinks = [];
     for (const link of links) {
       if (!link || typeof link !== 'object' || !link.url || typeof link.url !== 'string' || !link.url.trim()) {
         continue;
       }
-      
+
+      // 过滤已归档的链接
+      if (!includeArchived && link.archived) {
+        continue;
+      }
+
       validLinks.push({
         id: link.id,
         title: (link.title || '').trim(),
         url: link.url.trim(),
         tags: parseTags(link.tags), // 导出时转换为数组格式
         timestamp: link.timestamp || new Date().toISOString(),
-        pinned: link.pinned || false
+        pinned: link.pinned || false,
+        archived: link.archived || false,
+        archivedAt: link.archivedAt || null
       });
     }
-    
+
     console.log(`[loadLinks] 验证后有效链接: ${validLinks.length} 条`);
-    
+
     // 排序：置顶的在前，然后按时间戳倒序排序
     const sortedLinks = validLinks.sort((a, b) => {
       const aPinned = a.pinned || false;
@@ -568,13 +575,104 @@ export async function loadLinks() {
       const timeB = new Date(b.timestamp || 0).getTime();
       return timeB - timeA;
     });
-    
+
     console.log('[loadLinks] 加载完成，返回', sortedLinks.length, '条链接');
     return sortedLinks;
   } catch (error) {
     console.error('[loadLinks] 加载链接失败:', error.name, error.message, error.stack);
     return [];
   }
+}
+
+/**
+ * 加载已归档的链接
+ * @returns {Promise<Array>} 已归档的链接数组
+ */
+export async function loadArchivedLinks() {
+  console.log('[loadArchivedLinks] 开始加载已归档链接');
+  try {
+    const db = await initDB();
+    if (!db || db.objectStoreNames.length === 0) {
+      console.error('[loadArchivedLinks] 数据库连接无效');
+      return [];
+    }
+
+    const store = getStore(db, STORE_NAME, 'readonly');
+    const links = await getAll(store);
+    console.log('[loadArchivedLinks] 从数据库获取到', links.length, '条原始链接');
+
+    // 只返回已归档的链接
+    const archivedLinks = [];
+    for (const link of links) {
+      if (!link || typeof link !== 'object' || !link.url) {
+        continue;
+      }
+      console.log('[loadArchivedLinks] 检查链接:', link.id, 'archived:', link.archived, '类型:', typeof link.archived);
+      if (link.archived === true) {  // 使用严格等于检查
+        archivedLinks.push({
+          id: link.id,
+          title: (link.title || '').trim(),
+          url: link.url.trim(),
+          tags: parseTags(link.tags),
+          timestamp: link.timestamp || new Date().toISOString(),
+          pinned: link.pinned || false,
+          archived: true,
+          archivedAt: link.archivedAt || null
+        });
+      }
+    }
+
+    // 按归档时间逆序排序
+    archivedLinks.sort((a, b) => {
+      const timeA = new Date(a.archivedAt || 0).getTime();
+      const timeB = new Date(b.archivedAt || 0).getTime();
+      return timeB - timeA;
+    });
+
+    console.log('[loadArchivedLinks] 加载完成，返回', archivedLinks.length, '条已归档链接');
+    return archivedLinks;
+  } catch (error) {
+    console.error('[loadArchivedLinks] 加载已归档链接失败:', error);
+    return [];
+  }
+}
+
+/**
+ * 归档链接
+ * @param {number} linkId - 链接ID
+ * @returns {Promise<void>}
+ */
+export async function archiveLink(linkId) {
+  console.log('[archiveLink] 归档链接:', linkId);
+  const db = await initDB();
+  const store = getStore(db, STORE_NAME, 'readwrite');
+  const link = await get(store, linkId);
+  if (!link) {
+    throw new Error('链接不存在');
+  }
+  link.archived = true;
+  link.archivedAt = new Date().toISOString();
+  await put(store, link);
+  console.log('[archiveLink] 归档成功');
+}
+
+/**
+ * 取消归档
+ * @param {number} linkId - 链接ID
+ * @returns {Promise<void>}
+ */
+export async function unarchiveLink(linkId) {
+  console.log('[unarchiveLink] 取消归档:', linkId);
+  const db = await initDB();
+  const store = getStore(db, STORE_NAME, 'readwrite');
+  const link = await get(store, linkId);
+  if (!link) {
+    throw new Error('链接不存在');
+  }
+  link.archived = false;
+  link.archivedAt = null;
+  await put(store, link);
+  console.log('[unarchiveLink] 取消归档成功');
 }
 
 /**
