@@ -55,13 +55,6 @@
       background: #555;
     }
 
-    .selection-page-card {
-      background-color: #f9f9f9;
-      border-left: 4px solid #2196F3;
-      padding: 12px;
-      margin-bottom: 10px;
-    }
-
     .selection-page-url {
       font-weight: bold;
       font-size: 14px;
@@ -76,12 +69,6 @@
       text-decoration: underline;
     }
 
-    .selection-count {
-      font-size: 12px;
-      color: #666;
-      margin-bottom: 8px;
-    }
-
     .selection-item {
       background-color: white;
       border: 1px solid #eee;
@@ -89,6 +76,8 @@
       margin-bottom: 6px;
       border-radius: 4px;
       font-size: 13px;
+      display: block;
+      overflow: visible;
     }
 
     .selection-item:last-child {
@@ -96,17 +85,38 @@
     }
 
     .selection-text {
+      display: block;
+      width: 100%;
       word-break: break-word;
+      overflow-wrap: anywhere;
       white-space: pre-wrap;
       margin-bottom: 6px;
-      max-height: 80px;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      /* allow the text container to grow with content */
+      max-height: none;
+      overflow: visible;
+      text-overflow: clip;
       cursor: pointer;
+      position: relative;
+      z-index: 1;
+      line-height: 1.6;
     }
 
-    .selection-text.expanded {
-      max-height: none;
+    .selection-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      position: relative;
+      z-index: 3;
+    }
+
+    .selection-action-btn {
+      background: transparent;
+      border: none;
+      border-radius: 4px;
+      color: #999;
+      cursor: pointer;
+      font-size: 12px;
+      padding: 2px 4px;
     }
 
     .selection-text:hover {
@@ -114,25 +124,15 @@
     }
 
     .selection-meta {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+      display: block;
       font-size: 11px;
       color: #999;
+      margin-top: 6px;
     }
 
-    .selection-actions {
-      display: flex;
-      gap: 8px;
-    }
-
-    .selection-action-btn {
-      background: transparent;
-      border: none;
-      color: #999;
-      cursor: pointer;
-      font-size: 12px;
-      padding: 2px 4px;
+    .selection-meta .selection-time {
+      display: block;
+      margin-bottom: 6px;
     }
 
     .selection-action-btn:hover {
@@ -145,20 +145,6 @@
 
     .selection-action-btn.copy:hover {
       color: #4CAF50;
-    }
-
-    .delete-all-btn {
-      background: transparent;
-      border: none;
-      color: #f44336;
-      cursor: pointer;
-      font-size: 12px;
-      padding: 4px 8px;
-      margin-top: 8px;
-    }
-
-    .delete-all-btn:hover {
-      text-decoration: underline;
     }
 
     .empty-state {
@@ -323,7 +309,7 @@
 
     body.compact-mode .selection-text {
       font-size: 12px;
-      max-height: 60px;
+      max-height: none;
     }
 
     body.compact-mode .selection-meta {
@@ -344,31 +330,6 @@
     .selection-preview {
       margin-bottom: 12px;
       padding-left: 6px;
-    }
-
-    .selection-preview .selection-item {
-      background-color: #ffffff;
-      border: 1px solid #eee;
-      padding: 8px;
-      margin-bottom: 6px;
-      border-radius: 4px;
-      font-size: 13px;
-    }
-
-    .selection-preview .selection-text {
-      white-space: pre-wrap;
-      word-break: break-word;
-      max-height: none;
-      overflow: visible;
-      margin-bottom: 6px;
-    }
-
-    .selection-preview .selection-meta {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 11px;
-      color: #999;
     }
 
     /* 自定义确认弹窗样式 */
@@ -403,6 +364,64 @@
       display: flex;
       justify-content: flex-end;
       gap: 8px;
+    }
+
+    /* 段落标签 */
+    .selection-tag {
+      display: inline-block;
+      background-color: #e8f5e9;
+      color: #2e7d32;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 11px;
+      font-weight: 500;
+      margin-right: 6px;
+      font-family: monospace;
+    }
+
+    .selection-header {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      margin-bottom: 8px;
+      font-size: 12px;
+      gap: 4px;
+    }
+
+    /* HTML内容详情展开 */
+    .selection-html-details {
+      margin-top: 6px;
+      padding: 6px;
+      background-color: #fafafa;
+      border: 1px solid #e0e0e0;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+
+    .selection-html-details summary {
+      outline: none;
+      cursor: pointer;
+      color: #666;
+      font-size: 11px;
+      user-select: none;
+    }
+
+    .selection-html-details summary:hover {
+      color: #333;
+    }
+
+    .selection-html-content {
+      margin-top: 6px;
+      padding: 6px;
+      background-color: white;
+      border: 1px solid #e0e0e0;
+      border-radius: 2px;
+      font-size: 12px;
+      font-family: monospace;
+      word-break: break-all;
+      color: #666;
+      max-height: 200px;
+      overflow-y: auto;
     }
   </style>
 </head>

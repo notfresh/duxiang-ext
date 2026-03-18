@@ -151,13 +151,55 @@ async function handleSaveSelection() {
             return;
         }
 
-        // 注入脚本获取选中的文本
+        // 注入脚本获取选中的文本和DOM信息
         try {
             const results = await chrome.scripting.executeScript({
                 target: { tabId: currentTab.id },
                 func: () => {
                     const selection = window.getSelection();
-                    return selection ? selection.toString().trim() : '';
+                    const text = selection ? selection.toString().trim() : '';
+                    
+                    if (!text) {
+                        return { text: '', html: '', contextTag: '' };
+                    }
+
+                    let contextTag = '';
+                    let html = '';
+                    
+                    // 获取选中范围的第一个节点
+                    if (selection.rangeCount > 0) {
+                        const range = selection.getRangeAt(0);
+                        const commonAncestor = range.commonAncestorContainer;
+                        
+                        // 获取最近的块级元素或文本所在的元素
+                        let element = commonAncestor.nodeType === Node.TEXT_NODE 
+                            ? commonAncestor.parentElement 
+                            : commonAncestor;
+                        
+                        // 向上查找，找到更有意义的块级元素
+                        let depth = 0;
+                        while (element && depth < 3) {
+                            const tagName = element.tagName.toLowerCase();
+                            if (['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'blockquote', 'div', 'article', 'section'].includes(tagName)) {
+                                contextTag = tagName;
+                                break;
+                            }
+                            element = element.parentElement;
+                            depth++;
+                        }
+                        
+                        // 克隆范围以获取HTML
+                        try {
+                            const fragment = range.cloneContents();
+                            const tempDiv = document.createElement('div');
+                            tempDiv.appendChild(fragment.cloneNode(true));
+                            html = tempDiv.innerHTML;
+                        } catch (e) {
+                            html = '';
+                        }
+                    }
+                    
+                    return { text, html, contextTag };
                 }
             });
 
@@ -167,7 +209,8 @@ async function handleSaveSelection() {
                 return;
             }
 
-            const selectedText = results[0]?.result;
+            const selectionData = results[0]?.result;
+            const selectedText = selectionData?.text;
 
             if (!selectedText || selectedText.length === 0) {
                 console.log('[background] 没有选中的文本');
@@ -176,9 +219,10 @@ async function handleSaveSelection() {
             }
 
             console.log('[background] 选中的文本:', selectedText.substring(0, 50) + '...');
+            console.log('[background] DOM信息 - 标签:', selectionData.contextTag, ', HTML长度:', selectionData.html?.length || 0);
 
             // 保存到 IndexedDB
-            await saveSelectionToDB(pageUrl, pageTitle, selectedText);
+            await saveSelectionToDB(pageUrl, pageTitle, selectedText, selectionData.html, selectionData.contextTag);
 
             console.log('[background] 选中文本保存成功');
             showNotification('已保存选中文本');
@@ -193,7 +237,7 @@ async function handleSaveSelection() {
 /**
  * 保存选中文本到 IndexedDB
  */
-async function saveSelectionToDB(url, title, text) {
+async function saveSelectionToDB(url, title, text, html = '', contextTag = '') {
     return new Promise((resolve, reject) => {
         const request = indexedDB.open(DB_NAME, DB_VERSION);
 
@@ -233,6 +277,8 @@ async function saveSelectionToDB(url, title, text) {
                 const existing = getRequest.result;
                 const newSelection = {
                     text: text,
+                    html: html || '',
+                    contextTag: contextTag || '',
                     time: new Date().toISOString()
                 };
 
@@ -328,7 +374,53 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         }
 
         try {
-            await saveSelectionToDB(tab.url, tab.title, info.selectionText.trim());
+            // 注入脚本获取DOM信息
+            const results = await chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                func: () => {
+                    const selection = window.getSelection();
+                    let contextTag = '';
+                    let html = '';
+                    
+                    if (selection.rangeCount > 0) {
+                        const range = selection.getRangeAt(0);
+                        const commonAncestor = range.commonAncestorContainer;
+                        
+                        // 获取最近的块级元素或文本所在的元素
+                        let element = commonAncestor.nodeType === Node.TEXT_NODE 
+                            ? commonAncestor.parentElement 
+                            : commonAncestor;
+                        
+                        // 向上查找，找到更有意义的块级元素
+                        let depth = 0;
+                        while (element && depth < 3) {
+                            const tagName = element.tagName.toLowerCase();
+                            if (['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'blockquote', 'div', 'article', 'section'].includes(tagName)) {
+                                contextTag = tagName;
+                                break;
+                            }
+                            element = element.parentElement;
+                            depth++;
+                        }
+                        
+                        // 克隆范围以获取HTML
+                        try {
+                            const fragment = range.cloneContents();
+                            const tempDiv = document.createElement('div');
+                            tempDiv.appendChild(fragment.cloneNode(true));
+                            html = tempDiv.innerHTML;
+                        } catch (e) {
+                            html = '';
+                        }
+                    }
+                    
+                    return { contextTag, html };
+                }
+            });
+
+            const domInfo = results[0]?.result || { contextTag: '', html: '' };
+            
+            await saveSelectionToDB(tab.url, tab.title, info.selectionText.trim(), domInfo.html, domInfo.contextTag);
             showNotification('已保存选中文本');
         } catch (error) {
             console.error('[background] 保存选中文本失败:', error);

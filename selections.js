@@ -14,6 +14,8 @@ const clearAllBtn = document.getElementById('clearAllBtn');
 // 当前状态
 let currentUrl = null;
 let allSelections = [];
+// 全局存储：用于保存每个selection-item的HTML数据
+const selectionHtmlStore = new Map();
 
 // 初始化
 async function init() {
@@ -121,6 +123,8 @@ async function loadUrlList() {
   try {
     const selections = await getAllSelections();
     allSelections = selections || [];
+    // 清空HTML存储，准备加载新数据
+    selectionHtmlStore.clear();
     renderUrlList(allSelections);
   } catch (error) {
     console.error('加载失败:', error);
@@ -150,9 +154,26 @@ function renderUrlList(selections) {
 
   // 为每个 URL 渲染一张卡片，并在其下展示全部选中文本预览（按时间倒序）
   container.innerHTML = sortedSelections.map(page => {
-    const previews = (page.selections || []).slice().sort((a, b) => new Date(b.time) - new Date(a.time)).map(sel => `
-      <div class="selection-item" data-url="${escapeHtml(page.url)}" data-time="${escapeHtml(sel.time)}">
-        <div class="selection-text">${escapeHtml(sel.text)}</div>
+    const previews = (page.selections || []).slice().sort((a, b) => new Date(b.time) - new Date(a.time)).map((sel, selIdx) => {
+      const contextTag = sel.contextTag || '';
+      const tagDisplay = contextTag ? `<span class="selection-tag">&lt;${contextTag}&gt;</span>` : '';
+      
+      // 生成唯一ID用于存储HTML
+      const itemId = `${page.url}_${selIdx}_${sel.time}`;
+      if (sel.html) {
+        selectionHtmlStore.set(itemId, sel.html);
+      }
+      
+      // 根据HTML信息生成格式化的显示文本
+      let displayText = sel.text;
+      if (sel.html && sel.html.trim()) {
+        displayText = htmlToFormattedText(sel.html);
+      }
+      
+      return `
+      <div class="selection-item" data-url="${escapeHtml(page.url)}" data-time="${escapeHtml(sel.time)}" data-item-id="${escapeHtml(itemId)}">
+        ${tagDisplay ? `<div class="selection-header">${tagDisplay}</div>` : ''}
+        <div class="selection-text">${escapeHtml(displayText)}</div>
         <div class="selection-meta">
           <span class="selection-time">${formatDate(sel.time)}</span>
           <div class="selection-actions">
@@ -161,7 +182,8 @@ function renderUrlList(selections) {
           </div>
         </div>
       </div>
-    `).join('');
+    `;
+    }).join('');
 
     return `
       <div class="url-card" data-url="${escapeHtml(page.url)}">
@@ -208,16 +230,16 @@ function renderUrlList(selections) {
     });
   });
 
-  // 复制单条预览
+  // 复制单条预览 - 复制格式化后的文本
   container.querySelectorAll('.selection-action-btn.copy').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const item = e.target.closest('.selection-item');
-      const url = item.dataset.url;
-      const time = item.dataset.time;
-      const text = item.querySelector('.selection-text').textContent || '';
-      // 直接复制文本
-      navigator.clipboard.writeText(text).then(() => showStatus('已复制到剪贴板')).catch(err => showStatus('复制失败: ' + err.message));
+      const displayedText = item.querySelector('.selection-text').textContent || '';
+      
+      console.log('[renderUrlList] 复制格式化文本，长度:', displayedText.length);
+
+      navigator.clipboard.writeText(displayedText).then(() => showStatus('已复制到剪贴板')).catch(err => showStatus('复制失败: ' + err.message));
     });
   });
 
@@ -298,6 +320,9 @@ function renderSelections(page) {
     return;
   }
 
+  // 清空之前的存储
+  selectionHtmlStore.clear();
+
   // 按时间排序，最新的在前
   const sortedSelections = [...page.selections].sort((a, b) => {
     return new Date(b.time) - new Date(a.time);
@@ -307,24 +332,55 @@ function renderSelections(page) {
     <div class="selection-page-info">
       <div class="selection-page-url">${escapeHtml(page.url)}</div>
     </div>
-  ` + sortedSelections.map((sel, idx) => `
-    <div class="selection-item" data-url="${escapeHtml(page.url)}" data-index="${idx}">
-      <div class="selection-text">${escapeHtml(sel.text)}</div>
-      <div class="selection-meta">
+  ` + sortedSelections.map((sel, idx) => {
+    // 构建标签信息
+    const contextTag = sel.contextTag || '';
+    const tagDisplay = contextTag ? `<span class="selection-tag">&lt;${contextTag}&gt;</span>` : '';
+    
+    // 生成唯一ID用于存储HTML
+    const itemId = `${page.url}_${idx}_${sel.time}`;
+    if (sel.html) {
+      selectionHtmlStore.set(itemId, sel.html);
+    }
+    
+    // 根据HTML信息生成格式化的显示文本
+    let displayText = sel.text;
+    if (sel.html && sel.html.trim()) {
+      displayText = htmlToFormattedText(sel.html);
+    }
+    
+    return `
+    <div class="selection-item" data-url="${escapeHtml(page.url)}" data-index="${idx}" data-item-id="${escapeHtml(itemId)}">
+      <div class="selection-header">
+        ${tagDisplay}
         <span class="selection-time">${formatDate(sel.time)}</span>
+      </div>
+      <div class="selection-text">${escapeHtml(displayText)}</div>
+      ${sel.html ? `
+      <details class="selection-html-details">
+        <summary>查看原文构成</summary>
+        <div class="selection-html-content">${sel.html}</div>
+      </details>
+      ` : ''}
+      <div class="selection-meta">
         <div class="selection-actions">
           <button class="selection-action-btn copy" data-action="copy">复制</button>
           <button class="selection-action-btn delete" data-action="delete">删除</button>
         </div>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 
-  // 绑定复制按钮事件
+  // 绑定复制按钮事件 - 复制格式化后的文本
   container.querySelectorAll('.selection-action-btn.copy').forEach(btn => {
     btn.addEventListener('click', (e) => {
-      const text = e.target.closest('.selection-item').querySelector('.selection-text').textContent;
-      navigator.clipboard.writeText(text).then(() => {
+      const item = e.target.closest('.selection-item');
+      const displayedText = item.querySelector('.selection-text').textContent || '';
+      
+      console.log('[renderSelections] 复制格式化文本，长度:', displayedText.length);
+
+      navigator.clipboard.writeText(displayedText).then(() => {
         showStatus('已复制到剪贴板');
       }).catch(err => {
         showStatus('复制失败: ' + err.message);
@@ -365,6 +421,95 @@ function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+/**
+ * 将HTML转换为格式化的纯文本，处理块级元素的换行
+ * @param {string} html - 原始HTML字符串
+ * @returns {string} 格式化的纯文本
+ */
+function htmlToFormattedText(html) {
+  if (!html || !html.trim()) {
+    console.log('[htmlToFormattedText] HTML为空');
+    return '';
+  }
+
+  try {
+    console.log('[htmlToFormattedText] 开始处理HTML，长度:', html.length);
+    
+    // 创建一个临时容器来解析HTML
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+
+    // 块级元素定义
+    const blockElements = new Set([
+      'address', 'article', 'aside', 'blockquote', 'canvas', 'dd', 'div', 'dl', 'dt',
+      'fieldset', 'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+      'header', 'hr', 'li', 'main', 'nav', 'ol', 'p', 'pre', 'section', 'table', 'ul',
+      'br' // br也当作块级元素处理
+    ]);
+
+    /**
+     * 提取纯文本，同时在块级元素边界处插入换行
+     */
+    function extractText(node, isFirstNode = true) {
+      let text = '';
+
+      for (let i = 0; i < node.childNodes.length; i++) {
+        const child = node.childNodes[i];
+
+        if (child.nodeType === Node.TEXT_NODE) {
+          // 文本节点：直接添加文本
+          const content = child.textContent;
+          if (content.trim()) {
+            // 前面需要换行吗？（当前面有内容且不是换行结尾时）
+            if (text && !text.endsWith('\n')) {
+              // text += '\n';
+            }
+            text += content.trim();
+          }
+        } else if (child.nodeType === Node.ELEMENT_NODE) {
+          const tagName = child.tagName.toLowerCase();
+          const isBlock = blockElements.has(tagName);
+
+          // 块级元素前添加换行
+          if (isBlock && text && !text.endsWith('\n')) {
+            text += '\n';
+          }
+
+          // 递归处理子元素
+          const childText = extractText(child, false);
+          if (childText) {
+            text += childText;
+          }
+
+          // 块级元素后添加换行
+          if (isBlock && childText && !text.endsWith('\n')) {
+            text += '\n';
+          }
+        }
+      }
+
+      return text;
+    }
+
+    let result = extractText(temp);
+
+    // 后处理：清理多余换行和空白
+    result = result
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0)
+      .join('\n');
+
+    console.log('[htmlToFormattedText] 转换完成，行数:', result.split('\n').length, '总长度:', result.length);
+    console.log('[htmlToFormattedText] 内容预览:', result.substring(0, 200));
+    
+    return result;
+  } catch (error) {
+    console.error('[htmlToFormattedText] 转换失败:', error);
+    return '';
+  }
 }
 
 function formatDate(dateStr) {
