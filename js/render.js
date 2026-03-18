@@ -158,6 +158,27 @@ export function renderLinks(container, links, onDelete, onEdit, onPin, onLog = n
 }
 
 /**
+ * 追加渲染链接到容器（不清空容器）
+ * @param {HTMLElement} container - 容器元素
+ * @param {Array} links - 要追加的链接数组
+ * @param {Function} onDelete - 删除回调函数
+ * @param {Function} onEdit - 编辑回调函数
+ * @param {Function} onPin - 置顶回调函数
+ * @param {Function} onLog - 日志回调函数（可选）
+ */
+export function appendLinks(container, links, onDelete, onEdit, onPin, onLog = null) {
+  if (!Array.isArray(links) || links.length === 0) return;
+
+  links.forEach((link, index) => {
+    if (onLog) {
+      onLog(`追加渲染: ${link.title || '无标题'}`);
+    }
+    const linkCard = createLinkCard(link, index, onDelete, onEdit, onPin, onLog);
+    container.appendChild(linkCard);
+  });
+}
+
+/**
  * 显示空状态
  * @param {HTMLElement} container - 容器元素
  */
