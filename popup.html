@@ -407,6 +407,30 @@
       margin-left: 8px;
     }
     
+    /* iframe 覆盖层 */
+    .iframe-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 2000;
+      background: white;
+      flex-direction: column;
+    }
+
+    .iframe-overlay.show {
+      display: flex;
+    }
+
+    .iframe-overlay iframe {
+      flex: 1;
+      border: none;
+      width: 100%;
+      height: 100%;
+    }
+
     /* 加载进度条 */
     .loading-progress {
       display: none;
@@ -873,6 +897,11 @@
       <button id="dismissShortcutTipBtn" class="shortcut-dismiss-btn">不再提示</button>
     </div>
   </div>
+  <!-- iframe 覆盖层，用于分组管理和选中文本页面，避免 JS 上下文销毁 -->
+  <div id="iframeOverlay" class="iframe-overlay">
+    <iframe id="overlayIframe" src="" title="子页面"></iframe>
+  </div>
+
   <!-- 隐藏的文件输入，用于导入 JSON -->
   <input type="file" id="jsonFileInput" accept=".json" style="display: none;">
   <div id="statusMessage" class="status-message" style="display: none;">加载中...</div>

@@ -1096,17 +1096,37 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
+  // iframe 覆盖层相关
+  const iframeOverlay = document.getElementById('iframeOverlay');
+  const overlayIframe = document.getElementById('overlayIframe');
+
+  function openIframeOverlay(url) {
+    overlayIframe.src = url;
+    iframeOverlay.classList.add('show');
+  }
+
+  function closeIframeOverlay() {
+    iframeOverlay.classList.remove('show');
+    overlayIframe.src = '';
+  }
+
+  // 子页面可通过 postMessage 请求关闭 overlay
+  window.addEventListener('message', (event) => {
+    if (event.data === 'closeOverlay') {
+      closeIframeOverlay();
+    }
+  });
+
   // 绑定分组管理按钮事件
   const groupsBtn = document.getElementById('groupsBtn');
   groupsBtn.addEventListener('click', function() {
-    window.location.href = 'group.html';
+    openIframeOverlay('group.html');
   });
 
   // 选中文本按钮
   const selectionsBtn = document.getElementById('selectionsBtn');
   selectionsBtn.addEventListener('click', () => {
-    // 使用内部导航加载 selections 页面（保持与 group.html 一致的 in-popup 行为）
-    window.location.href = 'selections.html';
+    openIframeOverlay('selections.html');
   });
 
   // 绑定设置对话框事件

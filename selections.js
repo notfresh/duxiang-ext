@@ -537,7 +537,13 @@ backBtn.addEventListener('click', () => {
 
 // 主页按钮
 homeBtn.addEventListener('click', () => {
-  window.location.href = 'popup.html';
+  if (window.parent !== window) {
+    // 在 iframe 内：通知父页面关闭 overlay
+    window.parent.postMessage('closeOverlay', '*');
+  } else {
+    // 独立窗口（快捷键打开）：跳转回主页
+    window.location.href = 'popup.html';
+  }
 });
 
 // 刷新按钮
