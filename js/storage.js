@@ -847,12 +847,21 @@ export async function batchAddLinks(links) {
           continue;
         }
         
-        // 验证 URL 格式
+        // 验证 URL 格式：仅对缺少协议的 URL 补充 https://，保留 edge:// file:// chrome:// 等合法协议
         if (!url.startsWith('http://') && !url.startsWith('https://')) {
-          url = url.startsWith('//') ? 'https:' + url : 'https://' + url;
-          if (i < 5) {
-            console.log(`[batchAddLinks] 第 ${i + 1} 条 URL 已修正: ${url.substring(0, 50)}`);
+          if (url.startsWith('//')) {
+            url = 'https:' + url;
+            if (i < 5) {
+              console.log(`[batchAddLinks] 第 ${i + 1} 条 URL 已修正: ${url.substring(0, 50)}`);
+            }
+          } else if (!url.includes('://')) {
+            // 没有协议头，视为普通域名，补充 https://
+            url = 'https://' + url;
+            if (i < 5) {
+              console.log(`[batchAddLinks] 第 ${i + 1} 条 URL 已修正: ${url.substring(0, 50)}`);
+            }
           }
+          // else: 含有 :// 的非 http/https 协议（如 edge:// file:// chrome:// 等），保持原样
         }
         
         const linkData = {

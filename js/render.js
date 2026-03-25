@@ -31,6 +31,13 @@ export function createLinkCard(link, index, onDelete, onEdit, onPin, onLog = nul
   title.textContent = link.title || '无标题';
   title.target = '_blank';
   title.title = link.title || '无标题'; // 悬停提示
+  // 对非 http/https 协议（如 file:// edge:// chrome://）使用 chrome.tabs.create 打开
+  if (link.url && !link.url.startsWith('http://') && !link.url.startsWith('https://')) {
+    title.addEventListener('click', function(event) {
+      event.preventDefault();
+      chrome.tabs.create({ url: link.url });
+    });
+  }
   cardHeader.appendChild(title);
   
   // 按钮容器
@@ -118,8 +125,11 @@ export function createLinkCard(link, index, onDelete, onEdit, onPin, onLog = nul
   
   // 添加点击事件
   urlLink.addEventListener('click', function(event) {
-    // 不阻止默认行为，让链接在新标签页打开
-    // 但记录点击（如果启用调试）
+    // 对非 http/https 协议（如 file:// edge:// chrome://）使用 chrome.tabs.create 打开
+    if (link.url && !link.url.startsWith('http://') && !link.url.startsWith('https://')) {
+      event.preventDefault();
+      chrome.tabs.create({ url: link.url });
+    }
     if (onLog) {
       onLog(`链接被点击: ${link.title}`);
     }
