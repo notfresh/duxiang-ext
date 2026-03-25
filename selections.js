@@ -330,7 +330,7 @@ function renderSelections(page) {
 
   container.innerHTML = `
     <div class="selection-page-info">
-      <div class="selection-page-url">${escapeHtml(page.url)}</div>
+      <a class="selection-page-url" href="${escapeHtml(page.url)}" target="_blank" title="${escapeHtml(page.url)}">${escapeHtml(page.url)}</a>
     </div>
   ` + sortedSelections.map((sel, idx) => {
     // 构建标签信息
