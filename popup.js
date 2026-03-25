@@ -190,7 +190,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // 加载存储的链接
   async function loadLinksFromStorage() {
     console.log('[loadLinksFromStorage] 开始加载数据');
-    showStatusMessage('正在加载数据...');
+    //showStatusMessage('正在加载数据...');
     logMessage('开始加载链接数据');
     
     // 停止上一次的后台加载（如果有1）
@@ -246,7 +246,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // 如果数据超出首屏，启动后台加载
         if (total > INITIAL_BATCH_SIZE) {
           updateLoadingProgress(renderedCount, total);
-          showStatusMessage(`已显示 ${renderedCount} / ${total} 条链接`);
+          //showStatusMessage(`已显示 ${renderedCount} / ${total} 条链接`);
           scheduleBackgroundLoading();
         } else {
           showStatusMessage(`共 ${total} 条链接`);
@@ -317,8 +317,26 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
           await archiveLink(parseInt(linkId));
           showStatusMessage('已归档');
-          // 刷新列表
-          await loadLinksFromStorage();
+          
+          // 只删除对应的 DOM 元素
+          const cardElement = linksContainer.querySelector(`[data-link-id="${linkId}"]`);
+          if (cardElement) {
+            cardElement.remove();
+          }
+          
+          // 从 loadedLinks 中移除该条数据
+          const linkIdNum = parseInt(linkId);
+          loadedLinks = loadedLinks.filter(l => l.id !== linkIdNum);
+          
+          // 更新搜索数据源
+          if (updateSearchFn) {
+            updateSearchFn(loadedLinks.slice(0, renderedCount));
+          }
+          
+          // 如果列表为空，显示空状态
+          if (loadedLinks.length === 0) {
+            showEmptyState(linksContainer);
+          }
         } catch (error) {
           showStatusMessage('归档失败: ' + error.message, true);
         }
@@ -422,8 +440,24 @@ document.addEventListener('DOMContentLoaded', function() {
         
         showStatusMessage('链接已删除');
         
-        // 重新加载链接（会自动更新搜索状态）
-        await loadLinksFromStorage();
+        // 只删除对应的 DOM 元素
+        const cardElement = linksContainer.querySelector(`[data-link-id="${link.id}"]`);
+        if (cardElement) {
+          cardElement.remove();
+        }
+        
+        // 从 loadedLinks 中移除该条数据
+        loadedLinks = loadedLinks.filter(l => l.id !== link.id);
+        
+        // 更新搜索数据源
+        if (updateSearchFn) {
+          updateSearchFn(loadedLinks.slice(0, renderedCount));
+        }
+        
+        // 如果列表为空，显示空状态
+        if (loadedLinks.length === 0) {
+          showEmptyState(linksContainer);
+        }
       } catch (error) {
         logMessage('删除链接失败: ' + error.message);
         showStatusMessage('删除失败', true);
@@ -514,11 +548,11 @@ document.addEventListener('DOMContentLoaded', function() {
       // 切换置顶状态
       await togglePinLink(link.id);
       
-      const isPinned = link.pinned || false;
+      const isPinned = link.pinned || false; // 切换前的状态
       showStatusMessage(isPinned ? '已取消置顶' : '已置顶');
       logMessage(`${isPinned ? '取消置顶' : '置顶'}链接: ${link.title || '无标题'}`);
       
-      // 重新加载链接列表
+      // 置顶/取消置顶都会改变列表顺序，直接重新加载以保证顺序正确
       await loadLinksFromStorage();
     } catch (error) {
       logMessage('切换置顶状态失败: ' + error.message);
@@ -538,10 +572,14 @@ document.addEventListener('DOMContentLoaded', function() {
       return;
     }
     
+    // 提前保存编辑状态标记（在 hideEditDialog 清空 currentEditingLink 之前）
+    const isEditMode = !!(currentEditingLink && currentEditingLink.id);
+    const editingLinkId = isEditMode ? currentEditingLink.id : null;
+    
     try {
-      if (currentEditingLink && currentEditingLink.id) {
+      if (isEditMode) {
         // 编辑模式：更新链接
-        await updateLink(currentEditingLink.id, {
+        await updateLink(editingLinkId, {
           title: title,
           url: url,
           tags: tags
@@ -559,20 +597,109 @@ document.addEventListener('DOMContentLoaded', function() {
           pinned: false
         };
         
-        await addLink(newLink);
+        // addLink 返回的是 ID（数字），不是对象
+        const addedId = await addLink(newLink);
         
         showStatusMessage('链接已添加');
         logMessage(`添加链接: ${title}`);
+        
+        // 隐藏对话框
+        hideEditDialog();
+        
+        // 构造完整的链接对象用于更新 loadedLinks 和 DOM
+        if (addedId) {
+          const addedLink = { ...newLink, id: addedId };
+          loadedLinks.unshift(addedLink); // 新链接添加到列表开头
+          
+          // 更新搜索数据源
+          if (updateSearchFn) {
+            updateSearchFn(loadedLinks.slice(0, renderedCount + 1));
+          }
+          
+          // 追加新卡片到 DOM
+          appendLinks(
+            linksContainer,
+            [addedLink],
+            handleDeleteLink,
+            handleEditLink,
+            handlePinLink,
+            isDebugMode ? logMessage : null
+          );
+          // 为新卡片添加归档按钮和文本截断
+          addArchiveButtons();
+          if (currentSettings) {
+            const allCards = linksContainer.querySelectorAll('.link-card');
+            if (allCards.length > 0) {
+              applyTextTruncation(allCards[0], currentSettings);
+            }
+          }
+          renderedCount += 1;
+        }
+        return;
       }
       
-      // 隐藏对话框
+      // 编辑模式：隐藏对话框
       hideEditDialog();
       
-      // 重新加载链接
-      await loadLinksFromStorage();
+      // 编辑模式：直接更新对应的 DOM 卡片（editingLinkId 已在 try 之前保存）
+      const cardElement = linksContainer.querySelector(`[data-link-id="${editingLinkId}"]`);
+      if (cardElement) {
+        try {
+          // 更新标题
+          const titleElement = cardElement.querySelector('.link-title');
+          if (titleElement) {
+            titleElement.textContent = title;
+            titleElement.removeAttribute('data-original-title');
+            titleElement.removeAttribute('title');
+          }
+          
+          // 更新URL（尝试找 .link-url 中的 a 标签，或直接在 .link-url 上）
+          let urlElement = cardElement.querySelector('.link-url a');
+          if (!urlElement) {
+            // 如果没有 a 标签，尝试直接在 .link-url 上
+            urlElement = cardElement.querySelector('.link-url');
+          }
+          if (urlElement) {
+            if (urlElement.tagName === 'A') {
+              urlElement.href = url;
+            }
+            urlElement.textContent = url;
+            urlElement.removeAttribute('data-original-url');
+            urlElement.removeAttribute('title');
+          }
+          
+          // 更新标签
+          const tagsElement = cardElement.querySelector('.link-tags');
+          if (tagsElement) {
+            if (tags) {
+              const tagsString = tagsArrayToString(tags);
+              tagsElement.textContent = tagsString || '';
+            } else {
+              tagsElement.textContent = '';
+            }
+          }
+          
+          // 应用文本截断（基于设置）
+          if (currentSettings) {
+            applyTextTruncation(cardElement, currentSettings);
+          }
+        } catch (domError) {
+          console.warn('[编辑-DOM更新] 更新卡片DOM出错:', domError);
+          // 如果DOM更新失败，不影响后续的搜索源更新
+        }
+      }
+      
+      // 编辑模式：重新加载链接数据以获取最新数据用于搜索
+      const updatedLinks = await loadLinks();
+      loadedLinks = updatedLinks;
+      
+      // 更新搜索数据源
+      if (updateSearchFn) {
+        updateSearchFn(loadedLinks.slice(0, renderedCount));
+      }
     } catch (error) {
       const errorMsg = error.message || '未知错误';
-      const action = currentEditingLink && currentEditingLink.id ? '更新' : '添加';
+      const action = isEditMode ? '更新' : '添加';
       logMessage(`${action}链接失败: ` + errorMsg);
       showStatusMessage(`${action}失败: ` + errorMsg, true);
     }
