@@ -50,6 +50,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const linkCountSpan = document.getElementById('linkCountSpan');
   const groupCountSpan = document.getElementById('groupCountSpan');
   const archivedCountSpan = document.getElementById('archivedCountSpan');
+  const dataSizeSpan = document.getElementById('dataSizeSpan');
   const viewArchivedBtn = document.getElementById('viewArchivedBtn');
   const archivedView = document.getElementById('archivedView');
   const archivedContainer = document.getElementById('archivedContainer');
@@ -62,13 +63,11 @@ document.addEventListener('DOMContentLoaded', function() {
   let updateSearchFn = null; // 搜索更新函数
   let currentSettings = null; // 当前设置
   
-  // 渐进式加载相关状态
-  const INITIAL_BATCH_SIZE = 100; // 首屏加载条数
-  const BATCH_SIZE = 10;          // 后台每批加载条数
-  const BATCH_INTERVAL = 200;     // 后台加载间隔(ms)
-  let backgroundLoadingTimer = null; // 后台加载定时器
-  let isBackgroundLoading = false;   // 后台加载标志
-  let renderedCount = 0;             // 已渲染数量
+  // 滚动加载相关状态
+  const PAGE_SIZE = 30;          // 每次滚动加载条数
+  let renderedCount = 0;         // 已渲染数量
+  let isSearchActive = false;    // 是否处于搜索模式
+  let scrollObserver = null;     // IntersectionObserver 实例
   const loadingProgress = document.getElementById('loadingProgress');
   
   // 包装工具函数，传入DOM元素
@@ -108,150 +107,156 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
   
-  // 停止后台加载
-  function stopBackgroundLoading() {
-    if (backgroundLoadingTimer) {
-      clearInterval(backgroundLoadingTimer);
-      backgroundLoadingTimer = null;
-    }
-    isBackgroundLoading = false;
-    if (loadingProgress) {
-      loadingProgress.classList.remove('active');
-    }
-  }
-  
   // 更新加载进度显示
   function updateLoadingProgress(rendered, total) {
     if (!loadingProgress) return;
     if (rendered >= total) {
       loadingProgress.classList.remove('active');
     } else {
-      loadingProgress.textContent = `加载中... 已显示 ${rendered} / ${total} 条`;
+      loadingProgress.textContent = `已显示 ${rendered} / ${total} 条`;
       loadingProgress.classList.add('active');
     }
   }
-  
-  // 启动后台渐进式加载
-  function scheduleBackgroundLoading() {
-    if (isBackgroundLoading) return;
-    
+
+  // 追加下一批链接到 DOM
+  function appendNextBatch() {
+    if (isSearchActive) return;
     const total = loadedLinks.length;
     if (renderedCount >= total) return;
-    
-    isBackgroundLoading = true;
-    console.log(`[渐进加载] 启动后台加载，已渲染 ${renderedCount}，共 ${total} 条`);
-    
-    backgroundLoadingTimer = setInterval(() => {
-      if (renderedCount >= total) {
-        // 加载完成
-        stopBackgroundLoading();
-        showStatusMessage(`共 ${total} 条链接`);
-        console.log(`[渐进加载] 全部加载完成`);
-        // 最终更新搜索数据源为全量数据
-        if (updateSearchFn) {
-          updateSearchFn(loadedLinks);
+
+    const batchEnd = Math.min(renderedCount + PAGE_SIZE, total);
+    const batch = loadedLinks.slice(renderedCount, batchEnd);
+
+    appendLinks(
+      linksContainer,
+      batch,
+      handleDeleteLink,
+      handleEditLink,
+      handlePinLink,
+      isDebugMode ? logMessage : null
+    );
+
+    addArchiveButtons();
+    if (currentSettings) {
+      const allCards = linksContainer.querySelectorAll('.link-card');
+      for (let i = renderedCount; i < batchEnd && i < allCards.length; i++) {
+        applyTextTruncation(allCards[i], currentSettings);
+      }
+    }
+
+    renderedCount = batchEnd;
+    updateLoadingProgress(renderedCount, total);
+
+    if (renderedCount >= total) {
+      destroyScrollObserver();
+      showStatusMessage(`共 ${total} 条链接`);
+    } else {
+      // 把哨兵移到列表末尾，确保下次触底仍能触发
+      const sentinel = document.getElementById('scrollSentinel');
+      if (sentinel) linksContainer.appendChild(sentinel);
+    }
+  }
+
+  // 创建底部哨兵元素并启动 IntersectionObserver
+  function setupScrollObserver() {
+    destroyScrollObserver();
+
+    // 若已全部渲染，无需 Observer
+    if (renderedCount >= loadedLinks.length) return;
+
+    // 创建/复用哨兵元素
+    let sentinel = document.getElementById('scrollSentinel');
+    if (!sentinel) {
+      sentinel = document.createElement('div');
+      sentinel.id = 'scrollSentinel';
+      sentinel.style.height = '1px';
+    }
+    linksContainer.appendChild(sentinel);
+
+    scrollObserver = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        appendNextBatch();
+        // 若还有更多，observer 会在下次哨兵可见时再触发
+        if (renderedCount >= loadedLinks.length) {
+          destroyScrollObserver();
         }
-        return;
       }
-      
-      const batchEnd = Math.min(renderedCount + BATCH_SIZE, total);
-      const batch = loadedLinks.slice(renderedCount, batchEnd);
-      
-      // 追加渲染这一批
-      appendLinks(
-        linksContainer,
-        batch,
-        handleDeleteLink,
-        handleEditLink,
-        handlePinLink,
-        isDebugMode ? logMessage : null
-      );
-      
-      // 对新追加的卡片应用归档按钮和文本截断
-      addArchiveButtons();
-      if (currentSettings) {
-        const allCards = linksContainer.querySelectorAll('.link-card');
-        // 只处理新追加的卡片
-        for (let i = renderedCount; i < batchEnd && i < allCards.length; i++) {
-          applyTextTruncation(allCards[i], currentSettings);
-        }
-      }
-      
-      renderedCount = batchEnd;
-      updateLoadingProgress(renderedCount, total);
-      
-      // 更新搜索数据源为已渲染的数据（方案A）
-      if (updateSearchFn) {
-        updateSearchFn(loadedLinks.slice(0, renderedCount));
-      }
-    }, BATCH_INTERVAL);
+    }, { threshold: 0, rootMargin: '0px 0px 200px 0px' });
+
+    scrollObserver.observe(sentinel);
+  }
+
+  // 销毁 IntersectionObserver 并移除哨兵
+  function destroyScrollObserver() {
+    if (scrollObserver) {
+      scrollObserver.disconnect();
+      scrollObserver = null;
+    }
+    const sentinel = document.getElementById('scrollSentinel');
+    if (sentinel) sentinel.remove();
   }
 
   // 加载存储的链接
   async function loadLinksFromStorage() {
     console.log('[loadLinksFromStorage] 开始加载数据');
-    //showStatusMessage('正在加载数据...');
     logMessage('开始加载链接数据');
-    
-    // 停止上一次的后台加载（如果有1）
-    stopBackgroundLoading();
+
+    // 销毁上一次的滚动观察器
+    destroyScrollObserver();
     renderedCount = 0;
-    
+    isSearchActive = false;
+
     try {
       console.log('[loadLinksFromStorage] 调用 loadLinks()...');
-      // 从 IndexedDB 加载数据
       loadedLinks = await loadLinks();
       console.log('[loadLinksFromStorage] loadLinks() 返回，数据条数:', loadedLinks?.length);
-      
-      // 确保 loadedLinks 是数组
+
       if (!Array.isArray(loadedLinks)) {
         console.error('[loadLinksFromStorage] loadedLinks 不是数组:', loadedLinks);
         loadedLinks = [];
       }
-      
+
       if (isDebugMode) {
         logMessage(`获取到 ${loadedLinks.length} 条链接数据`);
       }
-      
+
       if (loadedLinks.length === 0) {
         console.log('[loadLinksFromStorage] 没有数据，显示空状态');
         showEmptyState(linksContainer);
         showStatusMessage('没有保存的链接');
         return;
       }
-      
+
       try {
         const total = loadedLinks.length;
-        // 首屏：渲染前 INITIAL_BATCH_SIZE 条
-        const initialBatch = loadedLinks.slice(0, INITIAL_BATCH_SIZE);
+        // 首屏：渲染前 PAGE_SIZE 条
+        const initialBatch = loadedLinks.slice(0, PAGE_SIZE);
         console.log(`[loadLinksFromStorage] 首屏渲染 ${initialBatch.length} 条，共 ${total} 条`);
-        
+
         renderLinksList(initialBatch);
         renderedCount = initialBatch.length;
-        
-        // 设置搜索功能（方案A：搜索已渲染的数据）
+
+        // 搜索始终基于全量数据
         if (!updateSearchFn) {
           console.log('[loadLinksFromStorage] 初始化搜索功能');
           updateSearchFn = setupSearch(
             searchInput,
             clearSearchBtn,
             handleSearchResults,
-            initialBatch
+            loadedLinks
           );
         } else {
           console.log('[loadLinksFromStorage] 更新搜索数据源');
-          updateSearchFn(initialBatch);
+          updateSearchFn(loadedLinks);
         }
-        
-        // 如果数据超出首屏，启动后台加载
-        if (total > INITIAL_BATCH_SIZE) {
+
+        if (total > PAGE_SIZE) {
           updateLoadingProgress(renderedCount, total);
-          //showStatusMessage(`已显示 ${renderedCount} / ${total} 条链接`);
-          scheduleBackgroundLoading();
+          setupScrollObserver();
         } else {
           showStatusMessage(`共 ${total} 条链接`);
         }
-        
+
         console.log('[loadLinksFromStorage] 首屏加载完成');
       } catch (error) {
         console.error('[loadLinksFromStorage] 渲染链接时出错:', error.name, error.message, error.stack);
@@ -327,10 +332,11 @@ document.addEventListener('DOMContentLoaded', function() {
           // 从 loadedLinks 中移除该条数据
           const linkIdNum = parseInt(linkId);
           loadedLinks = loadedLinks.filter(l => l.id !== linkIdNum);
-          
-          // 更新搜索数据源
+          renderedCount = Math.min(renderedCount, loadedLinks.length);
+
+          // 更新搜索数据源（全量）
           if (updateSearchFn) {
-            updateSearchFn(loadedLinks.slice(0, renderedCount));
+            updateSearchFn(loadedLinks);
           }
           
           // 如果列表为空，显示空状态
@@ -409,19 +415,36 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  // 处理搜索结果
+  // 处理搜索结果（全量数据搜索）
   function handleSearchResults(filteredLinks, searchText) {
-    if (filteredLinks.length === 0 && searchText) {
-      // 显示搜索空状态
-      showSearchEmptyState(linksContainer, searchText);
-    } else {
-      // 渲染过滤后的链接
-      renderLinksList(filteredLinks);
-    }
-    
-    // 更新状态消息
     if (searchText) {
-      showStatusMessage(`找到 ${filteredLinks.length} 条匹配的链接`);
+      // 进入搜索模式：销毁滚动观察器，直接渲染全部匹配结果
+      isSearchActive = true;
+      destroyScrollObserver();
+      if (filteredLinks.length === 0) {
+        showSearchEmptyState(linksContainer, searchText);
+      } else {
+        renderLinksList(filteredLinks);
+      }
+      // 搜索统计放到进度条容器里
+      if (loadingProgress) {
+        loadingProgress.textContent = `找到 ${filteredLinks.length} / ${loadedLinks.length} 条`;
+        loadingProgress.classList.add('active');
+      }
+    } else {
+      // 退出搜索模式：恢复滚动加载
+      isSearchActive = false;
+      renderedCount = 0;
+      const initialBatch = loadedLinks.slice(0, PAGE_SIZE);
+      renderLinksList(initialBatch);
+      renderedCount = initialBatch.length;
+      if (loadedLinks.length > PAGE_SIZE) {
+        updateLoadingProgress(renderedCount, loadedLinks.length);
+        setupScrollObserver();
+      } else {
+        if (loadingProgress) loadingProgress.classList.remove('active');
+        showStatusMessage(`共 ${loadedLinks.length} 条链接`);
+      }
     }
   }
   
@@ -448,10 +471,11 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 从 loadedLinks 中移除该条数据
         loadedLinks = loadedLinks.filter(l => l.id !== link.id);
-        
-        // 更新搜索数据源
+        renderedCount = Math.min(renderedCount, loadedLinks.length);
+
+        // 更新搜索数据源（全量）
         if (updateSearchFn) {
-          updateSearchFn(loadedLinks.slice(0, renderedCount));
+          updateSearchFn(loadedLinks);
         }
         
         // 如果列表为空，显示空状态
@@ -610,28 +634,21 @@ document.addEventListener('DOMContentLoaded', function() {
         if (addedId) {
           const addedLink = { ...newLink, id: addedId };
           loadedLinks.unshift(addedLink); // 新链接添加到列表开头
-          
-          // 更新搜索数据源
+
+          // 更新搜索数据源（全量）
           if (updateSearchFn) {
-            updateSearchFn(loadedLinks.slice(0, renderedCount + 1));
+            updateSearchFn(loadedLinks);
           }
           
-          // 追加新卡片到 DOM
-          appendLinks(
-            linksContainer,
-            [addedLink],
-            handleDeleteLink,
-            handleEditLink,
-            handlePinLink,
-            isDebugMode ? logMessage : null
-          );
+          // 创建新卡片并插入到容器顶部
+          const { createLinkCard } = await import('./js/render.js');
+          const newCard = createLinkCard(addedLink, 0, handleDeleteLink, handleEditLink, handlePinLink, isDebugMode ? logMessage : null);
+          linksContainer.insertBefore(newCard, linksContainer.firstChild);
+
           // 为新卡片添加归档按钮和文本截断
           addArchiveButtons();
           if (currentSettings) {
-            const allCards = linksContainer.querySelectorAll('.link-card');
-            if (allCards.length > 0) {
-              applyTextTruncation(allCards[0], currentSettings);
-            }
+            applyTextTruncation(newCard, currentSettings);
           }
           renderedCount += 1;
         }
@@ -692,10 +709,10 @@ document.addEventListener('DOMContentLoaded', function() {
       // 编辑模式：重新加载链接数据以获取最新数据用于搜索
       const updatedLinks = await loadLinks();
       loadedLinks = updatedLinks;
-      
-      // 更新搜索数据源
+
+      // 更新搜索数据源（全量）
       if (updateSearchFn) {
-        updateSearchFn(loadedLinks.slice(0, renderedCount));
+        updateSearchFn(loadedLinks);
       }
     } catch (error) {
       const errorMsg = error.message || '未知错误';
@@ -1148,15 +1165,24 @@ document.addEventListener('DOMContentLoaded', function() {
       const archivedLinks = await loadArchivedLinks();
       const archivedCount = archivedLinks ? archivedLinks.length : 0;
 
+      // 估算数据大小
+      const allData = [...(links || []), ...(archivedLinks || [])];
+      const bytes = new Blob([JSON.stringify(allData)]).size;
+      const sizeText = bytes < 1024 * 1024
+        ? (bytes / 1024).toFixed(1) + ' KB'
+        : (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+
       // 更新显示
       if (linkCountSpan) linkCountSpan.textContent = linkCount;
       if (groupCountSpan) groupCountSpan.textContent = groupCount;
       if (archivedCountSpan) archivedCountSpan.textContent = archivedCount;
+      if (dataSizeSpan) dataSizeSpan.textContent = sizeText + '（估算）';
     } catch (error) {
       console.error('加载统计信息失败:', error);
       if (linkCountSpan) linkCountSpan.textContent = '-';
       if (groupCountSpan) groupCountSpan.textContent = '-';
       if (archivedCountSpan) archivedCountSpan.textContent = '-';
+      if (dataSizeSpan) dataSizeSpan.textContent = '-';
     }
   }
   
@@ -1409,8 +1435,8 @@ document.addEventListener('DOMContentLoaded', function() {
     console.error('[popup] 初始加载失败:', error);
   });
   
-  // 窗口关闭时停止后台加载
-  window.addEventListener('beforeunload', stopBackgroundLoading);
+  // 窗口关闭时销毁滚动观察器
+  window.addEventListener('beforeunload', destroyScrollObserver);
   
   // 测试 Service Worker 是否运行
   chrome.runtime.sendMessage({ type: 'ping' }, (response) => {
