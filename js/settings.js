@@ -41,6 +41,28 @@ export function getDefaultSettings() {
 }
 
 /**
+ * 生成 UUID v4（浏览器环境）
+ * @returns {string}
+ */
+export function generateUUIDv4() {
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    // Per RFC4122 v4
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+    return `${hex.substr(0,8)}-${hex.substr(8,4)}-${hex.substr(12,4)}-${hex.substr(16,4)}-${hex.substr(20,12)}`;
+  }
+  // Fallback simple random
+  return 'xxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+/**
  * 加载设置
  * @returns {Promise<Object>} 设置对象
  */
@@ -48,13 +70,13 @@ export async function loadSettings() {
   try {
     const db = await getDB();
     const store = getStore(db, SETTINGS_STORE_NAME, 'readonly');
-    
+
     const result = await get(store, SETTINGS_KEY);
-    
+
+    const defaultSettings = getDefaultSettings();
+
     if (result && result.value) {
-      // 合并默认设置，确保新添加的选项有默认值
-      const defaultSettings = getDefaultSettings();
-      return {
+      const merged = {
         ...defaultSettings,
         ...result.value,
         compactMode: {
@@ -62,14 +84,34 @@ export async function loadSettings() {
           ...(result.value.compactMode || {})
         }
       };
+
+      // Ensure deviceId exists; if not, generate and persist it
+      if (!merged.deviceId) {
+        merged.deviceId = generateUUIDv4();
+        try {
+          const storeRW = getStore(db, SETTINGS_STORE_NAME, 'readwrite');
+          await put(storeRW, { key: SETTINGS_KEY, value: merged, updatedAt: new Date().toISOString() });
+        } catch (e) {
+          console.warn('Unable to persist generated deviceId:', e);
+        }
+      }
+
+      return merged;
     }
-    
-    // 如果没有设置，返回默认设置
-    return getDefaultSettings();
+
+    // 没有设置时，返回并持久化默认设置（包含 deviceId）
+    const defaults = { ...defaultSettings, deviceId: generateUUIDv4() };
+    try {
+      const storeRW2 = getStore(db, SETTINGS_STORE_NAME, 'readwrite');
+      await put(storeRW2, { key: SETTINGS_KEY, value: defaults, updatedAt: new Date().toISOString() });
+    } catch (e) {
+      console.warn('Unable to persist default settings with deviceId:', e);
+    }
+    return defaults;
   } catch (error) {
     console.error('加载设置失败:', error);
-    // 出错时返回默认设置
-    return getDefaultSettings();
+    const fallback = { ...getDefaultSettings(), deviceId: generateUUIDv4() };
+    return fallback;
   }
 }
 
@@ -82,14 +124,14 @@ export async function saveSettings(settings) {
   try {
     const db = await getDB();
     const store = getStore(db, SETTINGS_STORE_NAME, 'readwrite');
-    
     const settingsData = {
       key: SETTINGS_KEY,
       value: settings,
       updatedAt: new Date().toISOString()
     };
-    
+
     await put(store, settingsData);
+    return;
   } catch (error) {
     console.error('保存设置失败:', error);
     throw error;

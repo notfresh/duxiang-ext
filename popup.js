@@ -4,7 +4,7 @@ import { renderLinks, appendLinks, showEmptyState, showSearchEmptyState } from '
 import { loadLinks, loadGroups, loadArchivedLinks, archiveLink, unarchiveLink, deleteLink as deleteLinkFromStorage, updateLink, exportLinks, batchAddLinks, togglePinLink, clearDatabase as clearDatabaseFromStorage, addLink } from './js/storage.js';
 import { importBookmarks } from './js/bookmarks.js';
 import { setupSearch } from './js/search.js';
-import { loadSettings, saveSettings, updateCompactModeSettings } from './js/settings.js';
+import { loadSettings, saveSettings, updateCompactModeSettings, generateUUIDv4 } from './js/settings.js';
 
 document.addEventListener('DOMContentLoaded', function() {
   // 获取DOM元素
@@ -38,6 +38,8 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // 设置对话框元素
   const settingsBtn = document.getElementById('settingsBtn');
+  const deviceIdInput = document.getElementById('deviceIdInput');
+  const regenerateDeviceIdBtn = document.getElementById('regenerateDeviceIdBtn');
   const settingsDialogOverlay = document.getElementById('settingsDialogOverlay');
   const compactModeCheckbox = document.getElementById('compactModeCheckbox');
   const showUrlCheckbox = document.getElementById('showUrlCheckbox');
@@ -1123,6 +1125,11 @@ document.addEventListener('DOMContentLoaded', function() {
         applyTextTruncation(card, currentSettings);
       });
     }
+
+    // 显示 deviceId
+    if (typeof deviceIdInput !== 'undefined' && deviceIdInput) {
+      deviceIdInput.value = settings.deviceId || '';
+    }
   }
   
   /**
@@ -1185,6 +1192,24 @@ document.addEventListener('DOMContentLoaded', function() {
       if (dataSizeSpan) dataSizeSpan.textContent = '-';
     }
   }
+
+  // 重置/生成新的 deviceId
+  if (typeof regenerateDeviceIdBtn !== 'undefined' && regenerateDeviceIdBtn) {
+    regenerateDeviceIdBtn.addEventListener('click', async () => {
+      try {
+        const newId = generateUUIDv4();
+        if (deviceIdInput) deviceIdInput.value = newId;
+        const settingsWithDevice = { ...(currentSettings || {}), deviceId: newId };
+        await saveSettings(settingsWithDevice);
+        currentSettings = settingsWithDevice;
+        showStatusMessage('已生成新的 device_id');
+        logMessage('生成新的 device_id: ' + newId);
+      } catch (e) {
+        console.error('重置 device_id 失败', e);
+        showStatusMessage('重置 device_id 失败', true);
+      }
+    });
+  }
   
   /**
    * 隐藏设置对话框
@@ -1210,18 +1235,53 @@ document.addEventListener('DOMContentLoaded', function() {
         showStatusMessage('字符数不能为负数', true);
         return;
       }
+
+      // 验证 deviceId 非空（允许用户自定义）
+      if (typeof deviceIdInput !== 'undefined' && deviceIdInput) {
+        const candidate = (deviceIdInput.value || '').trim();
+        if (!candidate) {
+          showStatusMessage('device_id 不能为空，请填写或点击重置生成。', true);
+          return;
+        }
+      }
       
-      // 更新设置
-      const updatedSettings = await updateCompactModeSettings({
-        enabled: compactModeEnabled,
-        showUrl: showUrl,
-        showDate: showDate,
-        showTags: showTags,
-        titleMaxChars: titleMaxChars,
-        urlMaxChars: urlMaxChars
-      });
-      
+      // 更新设置（立即更新 UI，后台异步持久化以减少延迟）
+      const updatedSettings = {
+        ...currentSettings,
+        compactMode: {
+          ...((currentSettings && currentSettings.compactMode) || {}),
+          enabled: compactModeEnabled,
+          showUrl: showUrl,
+          showDate: showDate,
+          showTags: showTags,
+          titleMaxChars: titleMaxChars,
+          urlMaxChars: urlMaxChars
+        }
+      };
+
       currentSettings = updatedSettings;
+
+      // 异步保存到存储，失败时记录但不阻塞 UI
+      saveSettings(updatedSettings).catch(err => {
+        logMessage('异步保存设置失败: ' + (err && err.message));
+        showStatusMessage('保存设置失败（请重试）', true);
+      });
+
+      // 保存 deviceId（如果 UI 中有值）——也以异步方式持久化
+      if (typeof deviceIdInput !== 'undefined' && deviceIdInput) {
+        const newDeviceId = (deviceIdInput.value || '').trim();
+        if (newDeviceId) {
+          const settingsWithDevice = { ...currentSettings, deviceId: newDeviceId };
+          // persist asynchronously
+          saveSettings(settingsWithDevice).then(() => {
+            currentSettings = settingsWithDevice;
+            logMessage('device_id 已保存');
+          }).catch(e => {
+            console.warn('保存 device_id 失败', e);
+            showStatusMessage('保存 device_id 失败', true);
+          });
+        }
+      }
       
       // 应用设置到UI
       applySettingsToUI(currentSettings);

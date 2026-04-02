@@ -969,6 +969,13 @@
         </div>
       </div>
       <div class="input-group" style="margin-top: 15px;">
+        <label style="font-size: 14px; color: #555; font-weight: 500; margin-bottom: 8px; display: block;">设备识别 (device_id)：</label>
+        <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+          <input type="text" id="deviceIdInput" placeholder="请输入或保留自动生成的 device_id" style="flex:1; padding:6px 8px; border:1px solid #ddd; border-radius:4px; font-size:13px;">
+          <button id="regenerateDeviceIdBtn" style="background-color:#FF9800; color:white; border:none; padding:6px 10px; border-radius:4px; cursor:pointer; font-size:13px;">重置</button>
+        </div>
+        <p style="font-size:12px; color:#999; margin:0 0 8px 0;">设备 ID 用于同步协议标识本端，若为空将自动生成不可为空。</p>
+
         <label style="font-size: 14px; color: #555; font-weight: 500; margin-bottom: 8px; display: block;">统计信息：</label>
         <div id="statsInfo" style="font-size: 13px; color: #666; margin-bottom: 8px;">
           <p style="margin: 4px 0;">链接总数：<span id="linkCountSpan">-</span></p>
