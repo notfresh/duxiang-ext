@@ -31,51 +31,95 @@ function matchesKeyword(text, keyword) {
 }
 
 /**
- * 检查链接是否匹配所有关键词
+ * 解析搜索文本，将 tag:/title:/url: 片段与普通关键词分开
+ * @param {string} searchText - 原始搜索文本
+ * @returns {{ tagFilters: string[], titleFilters: string[], urlFilters: string[], keywords: string[] }}
+ */
+function parseSearchText(searchText) {
+  const tagFilters = [];
+  const titleFilters = [];
+  const urlFilters = [];
+  const keywords = [];
+
+  for (const token of searchText.trim().split(/\s+/)) {
+    if (!token) continue;
+    const lower = token.toLowerCase();
+    if (lower.startsWith('tag:')) {
+      const val = token.slice(4);
+      if (val) tagFilters.push(val.toLowerCase());
+    } else if (lower.startsWith('title:')) {
+      const val = token.slice(6);
+      if (val) titleFilters.push(val.toLowerCase());
+    } else if (lower.startsWith('url:')) {
+      const val = token.slice(4);
+      if (val) urlFilters.push(val.toLowerCase());
+    } else {
+      keywords.push(lower);
+    }
+  }
+
+  return { tagFilters, titleFilters, urlFilters, keywords };
+}
+
+/**
+ * 检查链接是否匹配所有过滤器和普通关键词
  * @param {Object} link - 链接对象
- * @param {string[]} keywords - 关键词数组
+ * @param {string[]} tagFilters - tag: 提取出的标签关键词
+ * @param {string[]} titleFilters - title: 提取出的标题关键词
+ * @param {string[]} urlFilters - url: 提取出的 URL 关键词
+ * @param {string[]} keywords - 普通关键词数组
  * @returns {boolean} 是否匹配
  */
-function matchesAllKeywords(link, keywords) {
-  if (keywords.length === 0) return true;
-  
+function matchesLink(link, tagFilters, titleFilters, urlFilters, keywords) {
   const title = link.title || '';
   const url = link.url || '';
   const tags = parseTags(link.tags || '');
-  const tagsText = tags.join(' ');
-  
-  // 检查每个关键词是否在标题、URL 或标签中
-  return keywords.every(keyword => {
-    const keywordLower = keyword.toLowerCase();
-    return matchesKeyword(title, keywordLower) || 
-           matchesKeyword(url, keywordLower) ||
-           tags.some(tag => matchesKeyword(tag, keywordLower)) ||
-           matchesKeyword(tagsText, keywordLower);
-  });
+
+  // tag: 过滤：每个 tagFilter 都必须在标签列表里找到至少一个包含匹配
+  const tagMatch = tagFilters.every(tf =>
+    tags.some(t => t.toLowerCase().includes(tf))
+  );
+
+  // title: 过滤：每个 titleFilter 必须出现在标题里
+  const titleMatch = titleFilters.every(tf =>
+    matchesKeyword(title, tf)
+  );
+
+  // url: 过滤：每个 urlFilter 必须出现在 URL 里
+  const urlMatch = urlFilters.every(uf =>
+    matchesKeyword(url, uf)
+  );
+
+  // 普通关键词：在标题、URL、任意标签中全文匹配
+  const keywordMatch = keywords.every(kw =>
+    matchesKeyword(title, kw) ||
+    matchesKeyword(url, kw) ||
+    tags.some(t => matchesKeyword(t, kw))
+  );
+
+  return tagMatch && titleMatch && urlMatch && keywordMatch;
 }
 
 /**
  * 搜索链接
- * 支持在标题、URL 和标签中搜索
+ * 支持 tag:XXX 语法专门匹配标签，其余词在标题、URL、标签中全文搜索
+ * 多个词之间为 AND 关系，例如：tag:前端 react
  * @param {string} searchText - 搜索文本
  * @param {Array} links - 链接数组
  * @returns {Array} 匹配的链接数组
  */
 export function searchLinks(searchText, links) {
-  // 如果搜索文本为空，返回所有链接
   if (!searchText || searchText.trim() === '') {
     return links;
   }
-  
-  // 将搜索文本按空格分割为关键词数组
-  const keywords = searchText.trim().split(/\s+/).filter(k => k.length > 0);
-  
-  if (keywords.length === 0) {
+
+  const { tagFilters, titleFilters, urlFilters, keywords } = parseSearchText(searchText);
+
+  if (tagFilters.length === 0 && titleFilters.length === 0 && urlFilters.length === 0 && keywords.length === 0) {
     return links;
   }
-  
-  // 过滤链接（匹配标题、URL 或标签）
-  return links.filter(link => matchesAllKeywords(link, keywords));
+
+  return links.filter(link => matchesLink(link, tagFilters, titleFilters, urlFilters, keywords));
 }
 
 /**

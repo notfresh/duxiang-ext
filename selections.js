@@ -45,7 +45,7 @@ async function init() {
 
 // 显示 URL 列表视图
 function showUrlListView() {
-  document.querySelector('h1').textContent = '选中文本';
+  document.querySelector('h1').textContent = '文本收藏';
   backBtn.style.display = 'none';
   homeBtn.style.display = 'block';
   refreshBtn.style.display = 'inline-block';
@@ -137,7 +137,7 @@ function renderUrlList(selections) {
   if (!selections || selections.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
-        <p>暂无保存的选中文本</p>
+        <p>暂无保存的文本收藏</p>
         <p>在网页上选中文字后，右键选择"保存文本到读享"</p>
         <p>或使用快捷键 Shift+Alt+C</p>
       </div>

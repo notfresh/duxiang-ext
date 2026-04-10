@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
-    "name": "读享收藏夹duxiang.ai",
-    "version": "1.1",
+    "name": "阅读收藏夹",
+    "version": "1.2",
     "description": "一个同步阅读内容的工具.",
     "permissions": [
         "activeTab",

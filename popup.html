@@ -3,842 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <title>阅读列表</title>
-  <style>
-    /* 重置所有样式，确保没有冲突 */
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    
-    html, body {
-      width: 400px;
-      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
-      background-color: #f5f5f5;
-      padding: 0; /* 移除内边距 */
-      margin: 0;
-      overflow: hidden; /* 禁用外部滚动条 */
-    }
-    
-    body {
-      display: flex;
-      flex-direction: column;
-      max-height: 600px;
-    }
-    
-    h1 {
-      font-size: 20px;
-      color: #333;
-      margin: 10px 0;
-      text-align: center;
-      background-color: #f5f5f5;
-      padding: 5px 0;
-    }
-    
-    .controls {
-      display: flex;
-      justify-content: center;
-      gap: 10px;
-      margin-top: auto;
-      margin-bottom: 10px;
-      background-color: #f5f5f5;
-      padding: 0 0 10px 0;
-    }
-    
-    button {
-      background-color: #4CAF50;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      padding: 5px 10px;
-      cursor: pointer;
-      font-size: 13px;
-      transition: background-color 0.2s;
-    }
-    
-    button:hover {
-      background-color: #45a049;
-    }
-    
-    #linksContainer {
-      background-color: white;
-      min-height: 100px;
-      flex: 1; /* 占据剩余空间，自动调整高度 */
-      overflow-y: auto;
-      overflow-x: hidden; /* 防止横向滚动条 */
-      margin-bottom: 10px;
-      padding: 10px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-      border-radius: 0; /* 移除圆角，使内容区域充满 */
-    }
-    
-    /* 确保滚动条样式一致 */
-    #linksContainer::-webkit-scrollbar {
-      width: 8px;
-    }
-    
-    #linksContainer::-webkit-scrollbar-track {
-      background: #f1f1f1;
-    }
-    
-    #linksContainer::-webkit-scrollbar-thumb {
-      background: #888;
-      border-radius: 4px;
-    }
-    
-    #linksContainer::-webkit-scrollbar-thumb:hover {
-      background: #555;
-    }
-    
-    .link-card {
-      background-color: #f9f9f9;
-      border-left: 4px solid #4CAF50;
-      padding: 12px;
-      margin-bottom: 10px;
-      transition: box-shadow 0.2s;
-    }
-    
-    .link-card:last-child {
-      margin-bottom: 0; /* 最后一个卡片移除底部间距 */
-    }
-    
-    .link-card:hover {
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-    }
-    
-    /* 卡片头部样式 */
-    .card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 8px;
-    }
-    
-    .link-title {
-      font-weight: bold;
-      font-size: 16px;
-      color: #333;
-      flex-grow: 1;
-      margin-bottom: 0 !important;
-      line-height: 1.3;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      max-width: 100%;
-      text-decoration: none;
-      cursor: pointer;
-      display: block;
-    }
-    
-    .link-title:hover {
-      color: #2a7ae2;
-      text-decoration: underline;
-    }
-    
-    /* 归档按钮样式 */
-    .archive-btn {
-      background-color: transparent;
-      color: #999;
-      border: none;
-      font-size: 16px;
-      cursor: pointer;
-      padding: 2px 4px;
-    }
-    .archive-btn:hover {
-      color: #666;
-    }
-
-    /* 删除按钮样式 */
-    .delete-btn {
-      background-color: transparent;
-      color: #999;
-      border: none;
-      border-radius: 50%;
-      width: 24px;
-      height: 24px;
-      font-size: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      margin-left: 8px;
-      padding: 0;
-      transition: all 0.2s;
-      flex-shrink: 0;
-    }
-    
-    .delete-btn:hover {
-      background-color: #ff5252;
-      color: white;
-    }
-    
-    /* 置顶按钮样式 */
-    .pin-btn {
-      background-color: transparent;
-      color: #999;
-      border: none;
-      border-radius: 50%;
-      width: 24px;
-      height: 24px;
-      font-size: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      padding: 0;
-      transition: all 0.2s;
-      flex-shrink: 0;
-      line-height: 1;
-    }
-    
-    /* 未置顶状态：灰色空心圆 */
-    .pin-btn:not(.pinned) {
-      color: #999;
-    }
-    
-    .pin-btn:not(.pinned):hover {
-      background-color: #FF9800;
-      color: white;
-    }
-    
-    /* 已置顶状态：橙色实心圆 */
-    .pin-btn.pinned {
-      color: #FF9800;
-    }
-    
-    .pin-btn.pinned:hover {
-      background-color: #FF9800;
-      color: white;
-    }
-    
-    /* 编辑按钮样式 */
-    .edit-btn {
-      background-color: transparent;
-      color: #999;
-      border: none;
-      border-radius: 50%;
-      width: 24px;
-      height: 24px;
-      font-size: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      padding: 0;
-      transition: all 0.2s;
-      flex-shrink: 0;
-    }
-    
-    .edit-btn:hover {
-      background-color: #2196F3;
-      color: white;
-    }
-    
-    .card-actions {
-      display: flex;
-      gap: 4px;
-      align-items: center;
-    }
-    
-    /* 编辑对话框样式 */
-    .edit-dialog-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-color: rgba(0, 0, 0, 0.5);
-      display: none;
-      justify-content: center;
-      align-items: center;
-      z-index: 1000;
-    }
-    
-    .edit-dialog-overlay.show {
-      display: flex;
-    }
-    
-    .edit-dialog {
-      background-color: white;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-      width: 90%;
-      max-width: 400px;
-      max-height: 90vh;
-      overflow-y: auto;
-    }
-    
-    /* 设置弹窗固定宽度 */
-    #settingsDialogOverlay .edit-dialog {
-      width: 800px;
-      max-width: 800px;
-    }
-    
-    .edit-dialog h2 {
-      margin: 0 0 15px 0;
-      font-size: 18px;
-      color: #333;
-    }
-    
-    .edit-dialog .input-group {
-      margin-bottom: 12px;
-    }
-    
-    .edit-dialog .input-group label {
-      display: block;
-      margin-bottom: 5px;
-      font-size: 14px;
-      color: #555;
-      font-weight: 500;
-    }
-    
-    .edit-dialog .input-group input {
-      width: 100%;
-      padding: 8px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-size: 14px;
-      box-sizing: border-box;
-    }
-    
-    .edit-dialog .input-group input:focus {
-      outline: none;
-      border-color: #4CAF50;
-    }
-    
-    .edit-dialog .input-group textarea {
-      width: 100%;
-      padding: 8px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-size: 14px;
-      font-family: inherit;
-      box-sizing: border-box;
-      resize: vertical;
-      min-height: 60px;
-      max-height: 200px;
-      line-height: 1.5;
-    }
-    
-    .edit-dialog .input-group textarea:focus {
-      outline: none;
-      border-color: #4CAF50;
-    }
-    
-    .edit-dialog .button-group {
-      display: flex;
-      gap: 10px;
-      justify-content: flex-end;
-      margin-top: 15px;
-    }
-    
-    .edit-dialog .button-group button {
-      padding: 8px 16px;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 14px;
-      transition: background-color 0.2s;
-    }
-    
-    .edit-dialog .button-group .cancel-btn {
-      background-color: #f5f5f5;
-      color: #333;
-    }
-    
-    .edit-dialog .button-group .cancel-btn:hover {
-      background-color: #e0e0e0;
-    }
-    
-    .edit-dialog .button-group .save-btn {
-      background-color: #4CAF50;
-      color: white;
-    }
-    
-    .edit-dialog .button-group .save-btn:hover {
-      background-color: #45a049;
-    }
-    
-    .link-url {
-      word-break: break-all;
-      margin-bottom: 8px;
-      font-size: 14px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      max-width: 100%;
-    }
-    
-    .link-url a {
-      color: #2a7ae2;
-      text-decoration: none;
-      display: inline-block;
-      max-width: 100%;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    
-    .link-url a:hover {
-      text-decoration: underline;
-    }
-    
-    .link-meta {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 12px;
-      color: #666;
-    }
-    
-    .link-tags span {
-      display: inline-block;
-      background-color: #eee;
-      padding: 2px 6px;
-      border-radius: 10px;
-      margin-right: 4px;
-      margin-bottom: 4px;
-    }
-    
-    .timestamp {
-      color: #999;
-      flex-shrink: 0;
-      margin-left: 8px;
-    }
-    
-    /* iframe 覆盖层 */
-    .iframe-overlay {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      z-index: 2000;
-      background: white;
-      flex-direction: column;
-    }
-
-    .iframe-overlay.show {
-      display: flex;
-    }
-
-    .iframe-overlay iframe {
-      flex: 1;
-      border: none;
-      width: 100%;
-      height: 100%;
-    }
-
-    /* 加载进度条 */
-    .loading-progress {
-      display: none;
-      padding: 4px 10px;
-      background-color: #e8f5e9;
-      font-size: 12px;
-      color: #2e7d32;
-      text-align: center;
-      border-bottom: 1px solid #c8e6c9;
-      flex-shrink: 0;
-    }
-    
-    .loading-progress.active {
-      display: block;
-    }
-    
-    .empty-state {
-      text-align: center;
-      padding: 30px 0;
-      color: #666;
-    }
-    
-    .empty-state p {
-      margin-bottom: 15px;
-    }
-    
-    .add-link-btn {
-      background-color: #4CAF50;
-      color: white;
-      padding: 8px 16px;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 14px;
-      display: inline-block;
-    }
-    
-    .status-message {
-      text-align: center;
-      margin: 0;
-      padding: 8px;
-      background-color: #f8f8f8;
-      font-size: 14px;
-      color: #666;
-      border-top: 1px solid #eee;
-    }
-    
-    .error-message {
-      background-color: #fff0f0;
-      color: #d32f2f;
-    }
-    
-    /* 调试相关 */
-    #debugBtn {
-      display: none; /* 默认隐藏调试按钮 */
-    }
-    
-    .debug-panel {
-      background-color: #333;
-      color: #fff;
-      font-family: monospace;
-      padding: 10px;
-      font-size: 12px;
-      overflow-y: auto;
-      max-height: 150px;
-      white-space: pre-wrap;
-      margin-top: 0;
-      display: none; /* 始终默认隐藏 */
-    }
-    
-    /* 快捷键配置提示 */
-    .shortcut-tip {
-      background-color: #e3f2fd;
-      border-top: 1px solid #90caf9;
-      padding: 10px;
-      margin-top: 0;
-    }
-    
-    .shortcut-tip-content {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-    
-    .shortcut-tip-content p {
-      margin: 0;
-      font-size: 13px;
-      color: #1976d2;
-      flex: 1;
-      min-width: 200px;
-    }
-    
-    .shortcut-tip-content strong {
-      color: #0d47a1;
-    }
-    
-    .shortcut-config-btn,
-    .shortcut-dismiss-btn {
-      padding: 6px 12px;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 12px;
-      white-space: nowrap;
-    }
-    
-    .shortcut-config-btn {
-      background-color: #2196F3;
-      color: white;
-    }
-    
-    .shortcut-config-btn:hover {
-      background-color: #1976d2;
-    }
-    
-    .shortcut-dismiss-btn {
-      background-color: transparent;
-      color: #666;
-      text-decoration: underline;
-    }
-    
-    .shortcut-dismiss-btn:hover {
-      color: #333;
-    }
-    
-    /* 搜索框样式 */
-    .search-container {
-      padding: 10px;
-      background-color: #f5f5f5;
-      border-bottom: 1px solid #eee;
-    }
-    
-    .search-wrapper {
-      position: relative;
-      display: flex;
-      align-items: center;
-    }
-    
-    .search-input {
-      width: 100%;
-      padding: 8px 30px 8px 10px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-size: 14px;
-      box-sizing: border-box;
-    }
-    
-    .search-input:focus {
-      outline: none;
-      border-color: #4CAF50;
-    }
-    
-    .search-clear-btn {
-      position: absolute;
-      right: 8px;
-      background: transparent;
-      border: none;
-      color: #999;
-      cursor: pointer;
-      font-size: 18px;
-      width: 20px;
-      height: 20px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0;
-      transition: color 0.2s;
-    }
-    
-    .search-clear-btn:hover {
-      color: #333;
-    }
-    
-    /* 紧凑模式显示/隐藏选项 */
-    /* 注意：这些选项可以在任何模式下使用，不限于紧凑模式 */
-    .hide-url .link-url {
-      display: none !important;
-    }
-    
-    .hide-date .timestamp {
-      display: none !important;
-    }
-    
-    .hide-tags .link-tags {
-      display: none !important;
-    }
-    
-    /* 紧凑模式下的显示/隐藏选项（方案要求，但当前实现更灵活） */
-    .compact-mode.hide-url .link-url {
-      display: none !important;
-    }
-    
-    .compact-mode.hide-date .timestamp {
-      display: none !important;
-    }
-    
-    .compact-mode.hide-tags .link-tags {
-      display: none !important;
-    }
-    
-    /* ========== 紧凑模式样式 ========== */
-    
-    /* 紧凑模式：卡片样式 */
-    .compact-mode .link-card {
-      padding: 8px;           /* 从12px减少到8px */
-      margin-bottom: 6px;     /* 从10px减少到6px */
-    }
-    
-    /* 紧凑模式：卡片头部 */
-    .compact-mode .card-header {
-      margin-bottom: 4px;      /* 从8px减少到4px */
-    }
-    
-    /* 紧凑模式：标题 */
-    .compact-mode .link-title {
-      font-size: 14px;        /* 从16px减少到14px */
-      line-height: 1.2;       /* 从1.3减少到1.2 */
-    }
-    
-    /* 紧凑模式：URL */
-    .compact-mode .link-url {
-      margin-bottom: 4px;     /* 从8px减少到4px */
-      font-size: 12px;        /* 从14px减少到12px */
-    }
-    
-    /* 紧凑模式：元信息（标签和时间戳） */
-    .compact-mode .link-meta {
-      font-size: 11px;        /* 从12px减少到11px */
-    }
-    
-    /* 紧凑模式：标签 */
-    .compact-mode .link-tags span {
-      padding: 1px 5px;       /* 从2px 6px减少到1px 5px */
-      margin-right: 3px;      /* 从4px减少到3px */
-      margin-bottom: 2px;     /* 从4px减少到2px */
-      font-size: 10px;        /* 标签文字稍小 */
-    }
-    
-    /* 紧凑模式：时间戳 */
-    .compact-mode .timestamp {
-      font-size: 10px;        /* 时间戳文字稍小 */
-    }
-    
-    /* 紧凑模式：按钮尺寸（可选，进一步紧凑） */
-    .compact-mode .pin-btn,
-    .compact-mode .edit-btn,
-    .compact-mode .delete-btn {
-      width: 20px;            /* 从24px减少到20px */
-      height: 20px;           /* 从24px减少到20px */
-      font-size: 12px;        /* 按钮图标稍小 */
-    }
-
-    /* ========== 选中文本视图样式 ========== */
-    .selection-page-card {
-      background-color: #f9f9f9;
-      border-left: 4px solid #2196F3;
-      padding: 12px;
-      margin-bottom: 10px;
-      transition: box-shadow 0.2s;
-    }
-
-    .selection-page-card:hover {
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-    }
-
-    .selection-page-url {
-      font-weight: bold;
-      font-size: 14px;
-      color: #333;
-      margin-bottom: 8px;
-      word-break: break-all;
-      cursor: pointer;
-    }
-
-    .selection-page-url:hover {
-      color: #2a7ae2;
-      text-decoration: underline;
-    }
-
-    .selection-count {
-      font-size: 12px;
-      color: #666;
-      margin-bottom: 8px;
-    }
-
-    .selection-item {
-      background-color: white;
-      border: 1px solid #eee;
-      padding: 8px;
-      margin-bottom: 6px;
-      border-radius: 4px;
-      font-size: 13px;
-      position: relative;
-    }
-
-    .selection-item:last-child {
-      margin-bottom: 0;
-    }
-
-    .selection-text {
-      word-break: break-word;
-      white-space: pre-wrap;
-      margin-bottom: 6px;
-      max-height: 80px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      cursor: pointer;
-    }
-
-    .selection-text.expanded {
-      max-height: none;
-    }
-
-    .selection-text:hover {
-      background-color: #f5f5f5;
-    }
-
-    /* selectionsContainer 滚动样式 */
-    #selectionsContainer {
-      flex: 1;
-      overflow-y: auto;
-      overflow-x: hidden;
-      padding-right: 5px;
-    }
-
-    #selectionsContainer::-webkit-scrollbar {
-      width: 8px;
-    }
-
-    #selectionsContainer::-webkit-scrollbar-track {
-      background: #f1f1f1;
-    }
-
-    #selectionsContainer::-webkit-scrollbar-thumb {
-      background: #888;
-      border-radius: 4px;
-    }
-
-    #selectionsContainer::-webkit-scrollbar-thumb:hover {
-      background: #555;
-    }
-
-    .selection-meta {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 11px;
-      color: #999;
-    }
-
-    .selection-actions {
-      display: flex;
-      gap: 8px;
-    }
-
-    .selection-action-btn {
-      background: transparent;
-      border: none;
-      color: #999;
-      cursor: pointer;
-      font-size: 12px;
-      padding: 2px 4px;
-    }
-
-    .selection-action-btn:hover {
-      color: #333;
-    }
-
-    .selection-action-btn.delete:hover {
-      color: #f44336;
-    }
-
-    .selection-action-btn.copy:hover {
-      color: #4CAF50;
-    }
-
-    .expand-btn {
-      background: transparent;
-      border: none;
-      color: #2196F3;
-      cursor: pointer;
-      font-size: 12px;
-      padding: 2px 4px;
-    }
-
-    .back-btn {
-      background-color: #f5f5f5;
-      border: 1px solid #ddd;
-      padding: 6px 12px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 13px;
-    }
-
-    .back-btn:hover {
-      background-color: #e0e0e0;
-    }
-  </style>
+  <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <h1>阅读列表</h1>
+  <h1>阅读列表 <span id="helpBtn" title="使用说明">?</span></h1>
   
   <!-- 搜索框 -->
   <div class="search-container">
     <div class="search-wrapper">
-      <input type="text" id="searchInput" class="search-input" placeholder="搜索标题、URL 或标签...">
+      <input type="text" id="searchInput" class="search-input" placeholder="搜索... 支持 tag: title: url: 前缀过滤">
       <button id="clearSearchBtn" class="search-clear-btn" title="清除搜索">×</button>
     </div>
   </div>
@@ -870,11 +43,11 @@
   <div id="selectionsView" style="display: none; flex-direction: column; height: 100%;">
     <div class="header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-shrink: 0;">
       <button id="backFromSelectionsBtn" class="back-btn">← 返回</button>
-      <span id="selectionsTitle">选中文本</span>
+      <span id="selectionsTitle">文本收藏</span>
     </div>
     <div id="selectionsContainer" style="flex: 1; overflow-y: auto; overflow-x: hidden;">
       <div class="empty-state">
-        <p>暂无保存的选中文本</p>
+        <p>暂无保存的文本收藏</p>
         <p>在网页上选中文字后，按 Shift+Alt+C 保存</p>
       </div>
     </div>
@@ -884,7 +57,7 @@
     <button id="addBtn">新增</button>
     <button id="exportBtn">导出</button>
     <button id="groupsBtn">分组管理</button>
-    <button id="selectionsBtn">选中文本</button>
+    <button id="selectionsBtn">文本收藏</button>
     <button id="settingsBtn">设置</button>
   </div>
   <!-- 快捷键配置提示 -->
@@ -1001,6 +174,82 @@
       <div class="button-group">
         <button id="settingsCancelBtn" class="cancel-btn">取消</button>
         <button id="settingsSaveBtn" class="save-btn">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 使用说明弹窗 -->
+  <div id="helpDialogOverlay" class="edit-dialog-overlay">
+    <div class="edit-dialog" style="max-width:420px;">
+      <h2>使用说明</h2>
+
+      <div class="input-group">
+        <label style="font-size:14px;color:#555;font-weight:500;display:block;margin-bottom:8px;">⌨️ 快捷键</label>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <tr style="background:#f5f5f5;">
+            <td style="padding:5px 8px;border:1px solid #eee;white-space:nowrap;"><strong>Shift+Alt+S</strong></td>
+            <td style="padding:5px 8px;border:1px solid #eee;">保存当前页面到阅读列表</td>
+          </tr>
+          <tr>
+            <td style="padding:5px 8px;border:1px solid #eee;white-space:nowrap;"><strong>Shift+Alt+G</strong></td>
+            <td style="padding:5px 8px;border:1px solid #eee;">打开分组管理</td>
+          </tr>
+          <tr style="background:#f5f5f5;">
+            <td style="padding:5px 8px;border:1px solid #eee;white-space:nowrap;"><strong>Shift+Alt+K</strong></td>
+            <td style="padding:5px 8px;border:1px solid #eee;">打开文本收藏页面</td>
+          </tr>
+          <tr>
+            <td style="padding:5px 8px;border:1px solid #eee;white-space:nowrap;"><strong>Shift+Alt+X</strong></td>
+            <td style="padding:5px 8px;border:1px solid #eee;">保存选中文字到文本收藏</td>
+          </tr>
+          <tr style="background:#f5f5f5;">
+            <td style="padding:5px 8px;border:1px solid #eee;white-space:nowrap;"><strong>ESC</strong></td>
+            <td style="padding:5px 8px;border:1px solid #eee;">关闭当前弹窗</td>
+          </tr>
+        </table>
+        <p style="font-size:12px;color:#e65100;margin:8px 0 0 0;">⚠️ 若快捷键无效，可能与系统或其他程序冲突，请前往浏览器扩展快捷键设置页面手动配置：<br><code style="background:#f5f5f5;padding:1px 4px;border-radius:3px;">chrome://extensions/shortcuts</code>（Edge 用 <code style="background:#f5f5f5;padding:1px 4px;border-radius:3px;">edge://extensions/shortcuts</code>）</p>
+      </div>
+
+      <div class="input-group" style="margin-top:14px;">
+        <label style="font-size:14px;color:#555;font-weight:500;display:block;margin-bottom:8px;">🔍 搜索语法</label>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <tr style="background:#f5f5f5;">
+            <td style="padding:5px 8px;border:1px solid #eee;white-space:nowrap;"><code>关键词</code></td>
+            <td style="padding:5px 8px;border:1px solid #eee;">在标题、URL、标签中全文搜索</td>
+          </tr>
+          <tr>
+            <td style="padding:5px 8px;border:1px solid #eee;white-space:nowrap;"><code>tag:前端</code></td>
+            <td style="padding:5px 8px;border:1px solid #eee;">只过滤含该标签的条目</td>
+          </tr>
+          <tr style="background:#f5f5f5;">
+            <td style="padding:5px 8px;border:1px solid #eee;white-space:nowrap;"><code>title:掘金</code></td>
+            <td style="padding:5px 8px;border:1px solid #eee;">只在标题中搜索</td>
+          </tr>
+          <tr>
+            <td style="padding:5px 8px;border:1px solid #eee;white-space:nowrap;"><code>url:github</code></td>
+            <td style="padding:5px 8px;border:1px solid #eee;">只在 URL 中搜索</td>
+          </tr>
+          <tr style="background:#f5f5f5;">
+            <td style="padding:5px 8px;border:1px solid #eee;white-space:nowrap;"><code>多词 空格</code></td>
+            <td style="padding:5px 8px;border:1px solid #eee;">多个条件同时满足（AND）</td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="input-group" style="margin-top:14px;">
+        <label style="font-size:14px;color:#555;font-weight:500;display:block;margin-bottom:6px;">📝 文本收藏</label>
+        <p style="font-size:13px;color:#555;margin:0 0 4px 0;">在网页上选中文字，按 <strong>Shift+Alt+X</strong> 保存；点击底部「文本收藏」按钮可按页面分组浏览所有收藏文字。</p>
+        <p style="font-size:12px;color:#999;margin:0;">相比收藏网址，文本收藏更适合保存文章片段、重要结论等内容。</p>
+      </div>
+
+      <div class="input-group" style="margin-top:14px;">
+        <label style="font-size:14px;color:#555;font-weight:500;display:block;margin-bottom:6px;">🃏 卡片操作</label>
+        <p style="font-size:13px;color:#555;margin:0;">📦 归档 &nbsp;·&nbsp; 📌 置顶 &nbsp;·&nbsp; ✎ 编辑 &nbsp;·&nbsp; × 删除</p>
+        <p style="font-size:12px;color:#999;margin:6px 0 0 0;">点击标题或 URL 在新标签页中直接打开链接。</p>
+      </div>
+
+      <div class="button-group" style="margin-top:16px;">
+        <button id="helpCloseBtn" class="save-btn">知道了</button>
       </div>
     </div>
   </div>

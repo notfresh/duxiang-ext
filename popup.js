@@ -1,5 +1,5 @@
 // 导入模块
-import { showStatus, log, tagsArrayToString, formatDate } from './js/utils.js';
+import { showStatus, log, tagsArrayToString, parseTags, formatDate } from './js/utils.js';
 import { renderLinks, appendLinks, showEmptyState, showSearchEmptyState } from './js/render.js';
 import { loadLinks, loadGroups, loadArchivedLinks, archiveLink, unarchiveLink, deleteLink as deleteLinkFromStorage, updateLink, exportLinks, batchAddLinks, togglePinLink, clearDatabase as clearDatabaseFromStorage, addLink } from './js/storage.js';
 import { importBookmarks } from './js/bookmarks.js';
@@ -687,15 +687,16 @@ document.addEventListener('DOMContentLoaded', function() {
             urlElement.removeAttribute('title');
           }
           
-          // 更新标签
+          // 更新标签（与 createLinkCard 保持一致，用 <span> 渲染每个标签）
           const tagsElement = cardElement.querySelector('.link-tags');
           if (tagsElement) {
-            if (tags) {
-              const tagsString = tagsArrayToString(tags);
-              tagsElement.textContent = tagsString || '';
-            } else {
-              tagsElement.textContent = '';
-            }
+            tagsElement.innerHTML = '';
+            const tagArray = parseTags(tags);
+            tagArray.forEach(tag => {
+              const tagSpan = document.createElement('span');
+              tagSpan.textContent = tag;
+              tagsElement.appendChild(tagSpan);
+            });
           }
           
           // 应用文本截断（基于设置）
@@ -1474,6 +1475,14 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
   
+  // 使用说明弹窗
+  const helpBtn = document.getElementById('helpBtn');
+  const helpDialogOverlay = document.getElementById('helpDialogOverlay');
+  const helpCloseBtn = document.getElementById('helpCloseBtn');
+  helpBtn.addEventListener('click', () => helpDialogOverlay.classList.add('show'));
+  helpCloseBtn.addEventListener('click', () => helpDialogOverlay.classList.remove('show'));
+  helpDialogOverlay.addEventListener('click', (e) => { if (e.target === helpDialogOverlay) helpDialogOverlay.classList.remove('show'); });
+
   // 绑定按钮事件
   addBtn.addEventListener('click', handleAddLink);
   importBookmarksBtn.addEventListener('click', handleImportBookmarks);
