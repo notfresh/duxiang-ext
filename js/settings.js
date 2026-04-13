@@ -138,6 +138,40 @@ export async function saveSettings(settings) {
   }
 }
 
+// Cached deviceId to avoid repeated DB lookups when possible
+let _cachedDeviceId = null;
+
+/**
+ * 获取 deviceId（优先返回缓存），若不存在则生成并持久化。
+ * @returns {Promise<string>} deviceId
+ */
+export async function getDeviceId() {
+  if (_cachedDeviceId) return _cachedDeviceId;
+  try {
+    const settings = await loadSettings();
+    if (settings && settings.deviceId) {
+      _cachedDeviceId = settings.deviceId;
+      return _cachedDeviceId;
+    }
+    // fallback: generate, persist and return
+    const newId = generateUUIDv4();
+    const s = { ...settings, deviceId: newId };
+    await saveSettings(s);
+    _cachedDeviceId = newId;
+    return _cachedDeviceId;
+  } catch (e) {
+    // last resort generate but do not persist
+    const newid = generateUUIDv4();
+    _cachedDeviceId = newid;
+    return newid;
+  }
+}
+
+/**
+ * 读取缓存中的 deviceId（可能为 null），用于同步时避免 await
+ */
+export function getCachedDeviceId() { return _cachedDeviceId; }
+
 /**
  * 更新紧凑模式设置
  * @param {Object} compactModeSettings - 紧凑模式设置对象
