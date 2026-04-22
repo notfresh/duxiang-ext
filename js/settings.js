@@ -24,6 +24,7 @@ async function getDB() {
  */
 export function getDefaultSettings() {
   return {
+    syncPeerUrl: '',
     compactMode: {
       enabled: false,
       showUrl: true,

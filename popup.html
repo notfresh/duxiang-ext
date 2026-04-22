@@ -167,6 +167,18 @@
         </div>
         <p style="font-size: 12px; color: #999; margin: 0;">导入JSON文件或从浏览器系统收藏夹导入</p>
       </div>
+      <div class="input-group" style="margin-top: 15px;">
+        <label style="font-size: 14px; color: #555; font-weight: 500; margin-bottom: 8px; display: block;">🔄 同步设置：</label>
+        <div style="margin-bottom: 8px;">
+          <label for="syncPeerUrlInput" style="display: block; margin-bottom: 4px; font-size: 13px; color: #666;">对端服务器 URL：</label>
+          <input type="text" id="syncPeerUrlInput" placeholder="http://192.168.1.100:3000" style="width: 100%; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; box-sizing: border-box;">
+        </div>
+        <div style="display: flex; gap: 8px; margin-top: 10px;">
+          <button id="syncPullBtn" style="background-color: #4CAF50; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px;">⬇ 拉取</button>
+          <button id="syncPushBtn" style="background-color: #2196F3; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px;">⬆ 推送</button>
+        </div>
+        <p id="syncStatusText" style="font-size: 12px; color: #999; margin: 8px 0 0 0;"></p>
+      </div>
       <div class="button-group" style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee;">
         <button id="clearDataBtn" style="background-color: #f44336; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px; margin-right: 10px;">清除数据</button>
         <button id="debugBtn" style="background-color: #2196F3; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px; margin-right: 10px;">调试</button>

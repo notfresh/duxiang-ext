@@ -49,6 +49,10 @@ document.addEventListener('DOMContentLoaded', function() {
   const urlMaxCharsInput = document.getElementById('urlMaxCharsInput');
   const settingsCancelBtn = document.getElementById('settingsCancelBtn');
   const settingsSaveBtn = document.getElementById('settingsSaveBtn');
+  const syncPeerUrlInput = document.getElementById('syncPeerUrlInput');
+  const syncPullBtn = document.getElementById('syncPullBtn');
+  const syncPushBtn = document.getElementById('syncPushBtn');
+  const syncStatusText = document.getElementById('syncStatusText');
   const linkCountSpan = document.getElementById('linkCountSpan');
   const groupCountSpan = document.getElementById('groupCountSpan');
   const archivedCountSpan = document.getElementById('archivedCountSpan');
@@ -1154,6 +1158,14 @@ document.addEventListener('DOMContentLoaded', function() {
     // 加载并显示统计信息
     loadAndShowStats();
 
+    // 填充同步设置
+    if (syncPeerUrlInput) {
+      syncPeerUrlInput.value = currentSettings.syncPeerUrl || '';
+    }
+    if (syncStatusText) {
+      syncStatusText.textContent = '';
+    }
+
     // 显示对话框
     settingsDialogOverlay.classList.add('show');
   }
@@ -1247,8 +1259,12 @@ document.addEventListener('DOMContentLoaded', function() {
       }
       
       // 更新设置（立即更新 UI，后台异步持久化以减少延迟）
+      // 获取同步 peer URL
+      const syncPeerUrl = syncPeerUrlInput ? (syncPeerUrlInput.value || '').trim() : '';
+
       const updatedSettings = {
         ...currentSettings,
+        syncPeerUrl: syncPeerUrl,
         compactMode: {
           ...((currentSettings && currentSettings.compactMode) || {}),
           enabled: compactModeEnabled,
@@ -1347,6 +1363,55 @@ document.addEventListener('DOMContentLoaded', function() {
   settingsBtn.addEventListener('click', showSettingsDialog);
   settingsCancelBtn.addEventListener('click', hideSettingsDialog);
   settingsSaveBtn.addEventListener('click', saveSettingsAndApply);
+
+  // 同步拉取按钮
+  if (syncPullBtn) {
+    syncPullBtn.addEventListener('click', async () => {
+      const peerUrl = syncPeerUrlInput ? syncPeerUrlInput.value.trim() : '';
+      if (!peerUrl) {
+        if (syncStatusText) syncStatusText.textContent = '请先输入对端 URL';
+        return;
+      }
+      if (syncStatusText) syncStatusText.textContent = '正在拉取...';
+      try {
+        const res = await chrome.runtime.sendMessage({ type: 'sync.pull', peerId: peerUrl, entityType: 'LINK' });
+        if (res && res.success) {
+          const cursor = res.data?.latestCursor || '-';
+          if (syncStatusText) syncStatusText.textContent = `拉取成功，cursor: ${cursor}`;
+          // 刷新链接列表
+          loadedLinks = await loadLinks(false);
+          renderLinksList(loadedLinks);
+        } else {
+          if (syncStatusText) syncStatusText.textContent = `拉取失败: ${res?.reason || '未知错误'}`;
+        }
+      } catch (e) {
+        if (syncStatusText) syncStatusText.textContent = '拉取异常: ' + e.message;
+      }
+    });
+  }
+
+  // 同步推送按钮
+  if (syncPushBtn) {
+    syncPushBtn.addEventListener('click', async () => {
+      const peerUrl = syncPeerUrlInput ? syncPeerUrlInput.value.trim() : '';
+      if (!peerUrl) {
+        if (syncStatusText) syncStatusText.textContent = '请先输入对端 URL';
+        return;
+      }
+      if (syncStatusText) syncStatusText.textContent = '正在推送...';
+      try {
+        const res = await chrome.runtime.sendMessage({ type: 'sync.push', peerId: peerUrl, entityType: 'LINK' });
+        if (res && res.success) {
+          const ack = res.ackCursor || '-';
+          if (syncStatusText) syncStatusText.textContent = `推送成功，ackCursor: ${ack}`;
+        } else {
+          if (syncStatusText) syncStatusText.textContent = `推送失败: ${res?.reason || '未知错误'}`;
+        }
+      } catch (e) {
+        if (syncStatusText) syncStatusText.textContent = '推送异常: ' + e.message;
+      }
+    });
+  }
 
   // 点击遮罩层关闭设置对话框
   settingsDialogOverlay.addEventListener('click', function(e) {

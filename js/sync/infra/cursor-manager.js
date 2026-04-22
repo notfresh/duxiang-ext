@@ -1,6 +1,7 @@
 import { put, get } from './sync-db.js';
 
 const CURSOR_STORE = 'sync_cursor';
+const DEFAULT_CURSOR = '2000-01-01T00:00:00.000Z';
 
 function makeKey(peerId, entityType, direction) {
   return `${peerId}#${entityType}#${direction}`;
@@ -14,7 +15,7 @@ export async function saveCursor(peerId, entityType, direction, cursor) {
 export async function getCursor(peerId, entityType, direction) {
   const key = makeKey(peerId, entityType, direction);
   const rec = await get(CURSOR_STORE, key);
-  return rec ? rec.cursor : null;
+  return rec ? rec.cursor : DEFAULT_CURSOR;
 }
 
 export async function getPullCursor(peerId, entityType) { return getCursor(peerId, entityType, 'pull'); }

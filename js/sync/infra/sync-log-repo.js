@@ -1,5 +1,5 @@
 import { put, getAll, queryIndex } from './sync-db.js';
-import { generateUUIDv4 } from '../../sync-utils.js';
+import { generateUUIDv4 } from '../sync-utils.js';
 
 const LOG_STORE = 'sync_log';
 
