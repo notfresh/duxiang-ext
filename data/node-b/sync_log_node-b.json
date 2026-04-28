@@ -1,0 +1,38 @@
+[
+  {
+    "logId": "7b119daf-fed9-4dcd-ae58-70b779fffc27",
+    "entityId": "bk-3",
+    "operation": "CREATE",
+    "timestamp": 1777353696391,
+    "payload": {
+      "bookmarkId": "bk-3",
+      "url": "https://stackoverflow.com",
+      "title": "Stack Overflow",
+      "updatedAt": 1777353696391
+    }
+  },
+  {
+    "logId": "2fa9f38d-0488-4ab9-8029-1de515872100",
+    "entityId": "bk-conflict",
+    "operation": "CREATE",
+    "timestamp": 1777353696516,
+    "payload": {
+      "bookmarkId": "bk-conflict",
+      "url": "https://b.com",
+      "title": "Version B (newer)",
+      "updatedAt": 1777353696516
+    }
+  },
+  {
+    "logId": "2c442aca-210a-4a8f-952e-fe5225e32eca",
+    "entityId": "bk-b1",
+    "operation": "CREATE",
+    "timestamp": 1777353696654,
+    "payload": {
+      "bookmarkId": "bk-b1",
+      "url": "https://b1.com",
+      "title": "From B",
+      "updatedAt": 1777353696654
+    }
+  }
+]

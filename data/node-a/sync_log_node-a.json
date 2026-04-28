@@ -1,0 +1,81 @@
+[
+  {
+    "logId": "5008049c-01dd-4fbe-92dd-41ad9e942721",
+    "entityId": "bk-1",
+    "operation": "CREATE",
+    "timestamp": 1777353696353,
+    "payload": {
+      "bookmarkId": "bk-1",
+      "url": "https://github.com",
+      "title": "GitHub",
+      "updatedAt": 1777353696353
+    }
+  },
+  {
+    "logId": "5785106e-57fd-4378-a2aa-7f5a6a5ab3aa",
+    "entityId": "bk-2",
+    "operation": "CREATE",
+    "timestamp": 1777353696376,
+    "payload": {
+      "bookmarkId": "bk-2",
+      "url": "https://python.org",
+      "title": "Python",
+      "updatedAt": 1777353696376
+    }
+  },
+  {
+    "logId": "42d5620a-41f4-4f8d-bb69-56535cc4ee7b",
+    "entityId": "bk-conflict",
+    "operation": "CREATE",
+    "timestamp": 1777353696401,
+    "payload": {
+      "bookmarkId": "bk-conflict",
+      "url": "https://a.com",
+      "title": "Version A",
+      "updatedAt": 1777353696401
+    }
+  },
+  {
+    "logId": "46384910-2d37-4c7c-a227-2d7df320c8b2",
+    "entityId": "bk-delete",
+    "operation": "CREATE",
+    "timestamp": 1777353696544,
+    "payload": {
+      "bookmarkId": "bk-delete",
+      "url": "https://example.com",
+      "title": "To Be Deleted",
+      "updatedAt": 1777353696544
+    }
+  },
+  {
+    "logId": "f090e8d4-f8fa-4de3-93bb-75fc2c2dc18a",
+    "entityId": "bk-delete",
+    "operation": "DELETE",
+    "timestamp": 1777353696556,
+    "payload": null
+  },
+  {
+    "logId": "c58427e4-a364-47c3-9f5a-7a1393d0c64f",
+    "entityId": "bk-push",
+    "operation": "CREATE",
+    "timestamp": 1777353696571,
+    "payload": {
+      "bookmarkId": "bk-push",
+      "url": "https://push-demo.com",
+      "title": "Push Demo",
+      "updatedAt": 1777353696571
+    }
+  },
+  {
+    "logId": "323c2816-0480-437b-bce9-4bde79445a5d",
+    "entityId": "bk-a1",
+    "operation": "CREATE",
+    "timestamp": 1777353696648,
+    "payload": {
+      "bookmarkId": "bk-a1",
+      "url": "https://a1.com",
+      "title": "From A",
+      "updatedAt": 1777353696648
+    }
+  }
+]

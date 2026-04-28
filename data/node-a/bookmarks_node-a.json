@@ -1,0 +1,44 @@
+{
+  "bk-1": {
+    "bookmarkId": "bk-1",
+    "url": "https://github.com",
+    "title": "GitHub",
+    "updatedAt": 1777353696353
+  },
+  "bk-2": {
+    "bookmarkId": "bk-2",
+    "url": "https://python.org",
+    "title": "Python",
+    "updatedAt": 1777353696376
+  },
+  "bk-3": {
+    "bookmarkId": "bk-3",
+    "url": "https://stackoverflow.com",
+    "title": "Stack Overflow",
+    "updatedAt": 1777353696391
+  },
+  "bk-conflict": {
+    "bookmarkId": "bk-conflict",
+    "url": "https://b.com",
+    "title": "Version B (newer)",
+    "updatedAt": 1777353696516
+  },
+  "bk-push": {
+    "bookmarkId": "bk-push",
+    "url": "https://push-demo.com",
+    "title": "Push Demo",
+    "updatedAt": 1777353696571
+  },
+  "bk-a1": {
+    "bookmarkId": "bk-a1",
+    "url": "https://a1.com",
+    "title": "From A",
+    "updatedAt": 1777353696648
+  },
+  "bk-b1": {
+    "bookmarkId": "bk-b1",
+    "url": "https://b1.com",
+    "title": "From B",
+    "updatedAt": 1777353696654
+  }
+}
