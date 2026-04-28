@@ -68,6 +68,7 @@ Interface ISyncProvider<T extends ISyncEntity> {
     // 发送侧直接读取 ISyncLog.GetPayload()，无需调用此方法
     Function GetEntityById(entityId: String): T;
 
+    // ========== 接收端写操作（原子性/幂等） ==========
     // [核心] 执行 Upsert (接收端用)
     // 框架命令：收到数据了，请执行“存在即更新，不存在即插入”
     Function Upsert(entity: T): Void;
@@ -75,6 +76,21 @@ Interface ISyncProvider<T extends ISyncEntity> {
     // [核心] 执行删除 (接收端用)
     // 框架命令：收到删除指令，请删除该 ID
     Function Delete(entityId: String): Void;
+
+    // ========== 写日志与原子写（方案 A） ==========
+    // 推荐：由 Provider 负责将业务写入与日志写入以事务/原子方式执行，保证数据与日志一致性。
+    // 1) 仅写日志（当日志存储由 provider 管理时可用）
+    Function AppendLog(log: ISyncLog): Void;
+
+    // 2) 在同一原子操作中写入实体并附带日志（Upsert + AppendLog）
+    Function UpsertWithLog(entity: T, log: ISyncLog): Void;
+
+    // 3) 在同一原子操作中删除实体并附带日志（Delete + AppendLog）
+    Function DeleteWithLog(entityId: String, log: ISyncLog): Void;
+
+    // 说明：
+    // - 这些方法使 provider 能在其存储边界内保证“数据写入 + 日志写入”的一致性；
+    // - 若业务层已有事务/写流程，也可以不实现带日志的原子方法，改由业务层直接调用 AppendLog。
 }
 ```
 
