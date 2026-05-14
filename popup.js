@@ -75,7 +75,6 @@ document.addEventListener('DOMContentLoaded', function() {
   let currentSettings = null; // 当前设置
 
   let historyCache = [];        // 缓存的历史记录列表
-  let historyMaxCount = 10;     // 最大历史记录数
   let hideDropdownTimeout = null; // 延迟隐藏定时器
   
   // 滚动加载相关状态
@@ -530,7 +529,6 @@ document.addEventListener('DOMContentLoaded', function() {
   // 刷新历史缓存并渲染
   async function refreshHistoryCache() {
     historyCache = await loadHistory();
-    historyMaxCount = await getMaxCount();
     if (searchHistoryDropdown && searchHistoryDropdown.style.display === 'block') {
       renderSearchHistory();
     }
@@ -1460,7 +1458,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
       // 更新搜索历史最大条数
       const newMaxCount = parseInt(searchHistoryMaxCountInput.value) || 10;
-      setMaxCount(newMaxCount);
+      await setMaxCount(newMaxCount);
+      await refreshHistoryCache();
 
       // 异步保存到存储，失败时记录但不阻塞 UI
       saveSettings(updatedSettings).catch(err => {
