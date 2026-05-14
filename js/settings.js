@@ -37,6 +37,9 @@ export function getDefaultSettings() {
       metaFontSize: 12,
       titleMaxChars: 0,      // 0表示不限制
       urlMaxChars: 0         // 0表示不限制
+    },
+    searchHistory: {
+      maxCount: 10
     }
   };
 }
@@ -83,6 +86,10 @@ export async function loadSettings() {
         compactMode: {
           ...defaultSettings.compactMode,
           ...(result.value.compactMode || {})
+        },
+        searchHistory: {
+          ...defaultSettings.searchHistory,
+          ...(result.value.searchHistory || {})
         }
       };
 
