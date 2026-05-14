@@ -5,6 +5,7 @@ import { loadLinks, loadGroups, loadArchivedLinks, archiveLink, unarchiveLink, d
 import { importBookmarks } from './js/bookmarks.js';
 import { setupSearch } from './js/search.js';
 import { loadSettings, saveSettings, updateCompactModeSettings, generateUUIDv4 } from './js/settings.js';
+import { loadHistory, addSearchKeyword, togglePinKeyword, deleteKeyword, getMaxCount, setMaxCount } from './js/searchHistory.js';
 
 document.addEventListener('DOMContentLoaded', function() {
   // 获取DOM元素
@@ -26,6 +27,9 @@ document.addEventListener('DOMContentLoaded', function() {
   // 搜索相关元素
   const searchInput = document.getElementById('searchInput');
   const clearSearchBtn = document.getElementById('clearSearchBtn');
+
+  // 搜索历史相关元素
+  const searchHistoryDropdown = document.getElementById('searchHistoryDropdown');
   
   // 编辑对话框元素
   const editDialogOverlay = document.getElementById('editDialogOverlay');
@@ -68,6 +72,10 @@ document.addEventListener('DOMContentLoaded', function() {
   let currentEditingLink = null; // 当前正在编辑的链接
   let updateSearchFn = null; // 搜索更新函数
   let currentSettings = null; // 当前设置
+
+  let historyCache = [];        // 缓存的历史记录列表
+  let historyMaxCount = 10;     // 最大历史记录数
+  let hideDropdownTimeout = null; // 延迟隐藏定时器
   
   // 滚动加载相关状态
   const PAGE_SIZE = 30;          // 每次滚动加载条数
@@ -254,7 +262,36 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
           console.log('[loadLinksFromStorage] 更新搜索数据源');
           updateSearchFn(loadedLinks);
+          refreshHistoryCache();
         }
+
+        // 搜索框 focus：当输入为空时显示历史下拉列表
+        searchInput.addEventListener('focus', () => {
+          if (!searchInput.value.trim()) {
+            showSearchHistoryDropdown();
+          }
+        });
+
+        // 搜索框 blur：延迟隐藏历史下拉列表
+        searchInput.addEventListener('blur', () => {
+          hideSearchHistoryDropdown();
+        });
+
+        // 搜索框输入时隐藏历史下拉列表
+        searchInput.addEventListener('input', () => {
+          if (searchInput.value.trim() && searchHistoryDropdown) {
+            searchHistoryDropdown.style.display = 'none';
+          }
+        });
+
+        // 清除搜索后，如果输入为空且获得焦点，显示历史下拉列表
+        clearSearchBtn.addEventListener('click', () => {
+          setTimeout(() => {
+            if (!searchInput.value.trim() && document.activeElement === searchInput) {
+              showSearchHistoryDropdown();
+            }
+          }, 50);
+        });
 
         if (total > PAGE_SIZE) {
           updateLoadingProgress(renderedCount, total);
@@ -343,8 +380,9 @@ document.addEventListener('DOMContentLoaded', function() {
           // 更新搜索数据源（全量）
           if (updateSearchFn) {
             updateSearchFn(loadedLinks);
+            refreshHistoryCache();
           }
-          
+
           // 如果列表为空，显示空状态
           if (loadedLinks.length === 0) {
             showEmptyState(linksContainer);
@@ -421,8 +459,138 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
+  // 渲染搜索历史下拉列表
+  function renderSearchHistory() {
+    if (!searchHistoryDropdown) return;
+
+    if (historyCache.length === 0) {
+      searchHistoryDropdown.innerHTML = '<div class="search-history-item" style="color:#999; cursor:default;">暂无搜索历史</div>';
+      searchHistoryDropdown.style.display = 'block';
+      return;
+    }
+
+    const pinned = historyCache.filter(i => i.pinned);
+    const unpinned = historyCache.filter(i => !i.pinned);
+
+    let html = '';
+
+    // Pinned 词区
+    if (pinned.length > 0) {
+      pinned.forEach(item => {
+        html += `
+          <div class="search-history-item" data-keyword="${escapeHtml(item.text)}">
+            <span class="search-history-item-text">${escapeHtml(item.text)}</span>
+            <div class="search-history-item-actions">
+              <button class="search-history-pin-btn pinned" data-action="togglePin" data-keyword="${escapeHtml(item.text)}" title="取消固定">📌</button>
+              <button class="search-history-delete-btn" data-action="delete" data-keyword="${escapeHtml(item.text)}" title="删除">✕</button>
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    // 分隔线（同时有 pinned 和 unpinned 时显示）
+    if (pinned.length > 0 && unpinned.length > 0) {
+      html += '<div class="search-history-separator"></div>';
+    }
+
+    // 普通历史词区
+    unpinned.forEach(item => {
+      html += `
+        <div class="search-history-item" data-keyword="${escapeHtml(item.text)}">
+          <span class="search-history-item-text">${escapeHtml(item.text)}</span>
+          <div class="search-history-item-actions">
+            <button class="search-history-pin-btn" data-action="togglePin" data-keyword="${escapeHtml(item.text)}" title="固定">📌</button>
+            <button class="search-history-delete-btn" data-action="delete" data-keyword="${escapeHtml(item.text)}" title="删除">✕</button>
+          </div>
+        </div>
+      `;
+    });
+
+    searchHistoryDropdown.innerHTML = html;
+    searchHistoryDropdown.style.display = 'block';
+  }
+
+  // 显示搜索历史下拉列表
+  function showSearchHistoryDropdown() {
+    clearTimeout(hideDropdownTimeout);
+    renderSearchHistory();
+  }
+
+  // 隐藏搜索历史下拉列表
+  function hideSearchHistoryDropdown() {
+    hideDropdownTimeout = setTimeout(() => {
+      if (searchHistoryDropdown) {
+        searchHistoryDropdown.style.display = 'none';
+      }
+    }, 200);
+  }
+
+  // 刷新历史缓存并渲染
+  async function refreshHistoryCache() {
+    historyCache = await loadHistory();
+    historyMaxCount = await getMaxCount();
+    if (searchHistoryDropdown && searchHistoryDropdown.style.display === 'block') {
+      renderSearchHistory();
+    }
+  }
+
+  // 绑定搜索历史下拉列表事件
+  function bindSearchHistoryEvents() {
+    if (!searchHistoryDropdown) return;
+
+    searchHistoryDropdown.addEventListener('click', async (e) => {
+      e.stopPropagation();
+
+      // 优先处理按钮点击（pin/delete）
+      const actionBtn = e.target.closest('[data-action]');
+      if (actionBtn) {
+        const action = actionBtn.dataset.action;
+        const keyword = actionBtn.dataset.keyword;
+
+        if (action === 'togglePin') {
+          await togglePinKeyword(keyword);
+          await refreshHistoryCache();
+        } else if (action === 'delete') {
+          await deleteKeyword(keyword);
+          await refreshHistoryCache();
+        }
+        return;
+      }
+
+      // 否则处理历史词文本点击
+      const item = e.target.closest('.search-history-item');
+      if (!item) return;
+
+      const keyword = item.dataset.keyword;
+      if (!keyword) return;
+
+      // 如果点击的是按钮区域，不触发选择
+      if (e.target.closest('.search-history-item-actions')) return;
+
+      searchInput.value = keyword;
+      searchHistoryDropdown.style.display = 'none';
+
+      // 触发搜索并记录
+      await addSearchKeyword(keyword);
+      const { searchLinks } = await import('./js/search.js');
+      const filtered = searchLinks(keyword, loadedLinks);
+      handleSearchResults(filtered, keyword);
+    });
+
+    // 下拉列表本身也需要阻止 blur 触发（防止点击下拉列表时先 blur searchInput）
+    searchHistoryDropdown.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+    });
+  }
+
   // 处理搜索结果（全量数据搜索）
-  function handleSearchResults(filteredLinks, searchText) {
+  async function handleSearchResults(filteredLinks, searchText) {
+    // 记录搜索历史（有搜索内容时）
+    if (searchText && searchText.trim()) {
+      await addSearchKeyword(searchText.trim());
+    }
+
     if (searchText) {
       // 进入搜索模式：销毁滚动观察器，直接渲染全部匹配结果
       isSearchActive = true;
@@ -482,8 +650,9 @@ document.addEventListener('DOMContentLoaded', function() {
         // 更新搜索数据源（全量）
         if (updateSearchFn) {
           updateSearchFn(loadedLinks);
+          refreshHistoryCache();
         }
-        
+
         // 如果列表为空，显示空状态
         if (loadedLinks.length === 0) {
           showEmptyState(linksContainer);
@@ -644,8 +813,9 @@ document.addEventListener('DOMContentLoaded', function() {
           // 更新搜索数据源（全量）
           if (updateSearchFn) {
             updateSearchFn(loadedLinks);
+            refreshHistoryCache();
           }
-          
+
           // 创建新卡片并插入到容器顶部
           const { createLinkCard } = await import('./js/render.js');
           const newCard = createLinkCard(addedLink, 0, handleDeleteLink, handleEditLink, handlePinLink, isDebugMode ? logMessage : null);
@@ -720,6 +890,7 @@ document.addEventListener('DOMContentLoaded', function() {
       // 更新搜索数据源（全量）
       if (updateSearchFn) {
         updateSearchFn(loadedLinks);
+        refreshHistoryCache();
       }
     } catch (error) {
       const errorMsg = error.message || '未知错误';
@@ -1560,11 +1731,17 @@ document.addEventListener('DOMContentLoaded', function() {
   // 初始加载
   // 先加载设置，再加载链接
   console.log('[popup] 开始初始加载');
+
+  // 绑定搜索历史事件
+  bindSearchHistoryEvents();
+
   loadAndApplySettings().then(() => {
     console.log('[popup] 设置加载完成，开始加载链接');
     loadLinksFromStorage();
     // 检查并显示快捷键配置提示
     checkAndShowShortcutTip();
+    // 刷新历史缓存
+    refreshHistoryCache();
   }).catch(error => {
     console.error('[popup] 初始加载失败:', error);
   });
