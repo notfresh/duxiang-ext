@@ -62,6 +62,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const archivedCountSpan = document.getElementById('archivedCountSpan');
   const dataSizeSpan = document.getElementById('dataSizeSpan');
   const viewArchivedBtn = document.getElementById('viewArchivedBtn');
+  const searchHistoryMaxCountInput = document.getElementById('searchHistoryMaxCountInput');
   const archivedView = document.getElementById('archivedView');
   const archivedContainer = document.getElementById('archivedContainer');
   const backFromArchivedBtn = document.getElementById('backFromArchivedBtn');
@@ -1337,6 +1338,11 @@ document.addEventListener('DOMContentLoaded', function() {
       syncStatusText.textContent = '';
     }
 
+    // 填充搜索历史设置
+    if (currentSettings && currentSettings.searchHistory) {
+      searchHistoryMaxCountInput.value = currentSettings.searchHistory.maxCount || 10;
+    }
+
     // 显示对话框
     settingsDialogOverlay.classList.add('show');
   }
@@ -1444,10 +1450,17 @@ document.addEventListener('DOMContentLoaded', function() {
           showTags: showTags,
           titleMaxChars: titleMaxChars,
           urlMaxChars: urlMaxChars
+        },
+        searchHistory: {
+          maxCount: parseInt(searchHistoryMaxCountInput.value) || 10
         }
       };
 
       currentSettings = updatedSettings;
+
+      // 更新搜索历史最大条数
+      const newMaxCount = parseInt(searchHistoryMaxCountInput.value) || 10;
+      setMaxCount(newMaxCount);
 
       // 异步保存到存储，失败时记录但不阻塞 UI
       saveSettings(updatedSettings).catch(err => {
