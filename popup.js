@@ -1,7 +1,7 @@
 // 导入模块
 import { showStatus, log, tagsArrayToString, parseTags, formatDate } from './js/utils.js';
 import { renderLinks, appendLinks, showEmptyState, showSearchEmptyState } from './js/render.js';
-import { loadLinks, loadGroups, loadArchivedLinks, archiveLink, unarchiveLink, deleteLink as deleteLinkFromStorage, updateLink, exportLinks, batchAddLinks, togglePinLink, clearDatabase as clearDatabaseFromStorage, addLink, addLinkToGroup, addGroup } from './js/storage.js';
+import { loadLinks, loadGroups, loadArchivedLinks, archiveLink, unarchiveLink, deleteLink as deleteLinkFromStorage, updateLink, exportLinks, batchAddLinks, togglePinLink, clearDatabase as clearDatabaseFromStorage, addLink, addLinkToGroup, removeLinkFromGroup, addGroup } from './js/storage.js';
 import { importBookmarks } from './js/bookmarks.js';
 import { setupSearch } from './js/search.js';
 import { loadSettings, saveSettings, updateCompactModeSettings, generateUUIDv4 } from './js/settings.js';
@@ -692,13 +692,13 @@ document.addEventListener('DOMContentLoaded', function() {
       editTagsInput.value = '';
     }
     // 加载并渲染分组选择列表
-    loadAndRenderGroups();
+    loadAndRenderGroups(link ? link.id : null);
     editDialogOverlay.classList.add('show');
     editTitleInput.focus();
   }
 
-  // 加载并渲染分组复选框列表
-  async function loadAndRenderGroups() {
+  /** 加载并渲染分组复选框列表，可选传入 linkId 进行预勾选 */
+  async function loadAndRenderGroups(linkId) {
     const groups = await loadGroups();
     selectedGroupIds = [];
     groupSelectContainer.innerHTML = '';
@@ -706,21 +706,54 @@ document.addEventListener('DOMContentLoaded', function() {
       groupSelectContainer.innerHTML = '<span style="font-size:12px;color:#999;">暂无分组，可新建</span>';
       return;
     }
+
+    // 如果有 linkId，找出已属于哪些分组
+    let existingGroupIds = new Set();
+    if (linkId != null) {
+      for (const g of groups) {
+        if (g.linkIds && g.linkIds.includes(linkId)) {
+          existingGroupIds.add(g.groupId);
+        }
+      }
+    }
+
     for (const g of groups) {
       const div = document.createElement('div');
       div.className = 'group-checkbox-item';
-      div.innerHTML = `<input type="checkbox" id="gcb_${g.groupId}" value="${g.groupId}"><label for="gcb_${g.groupId}">${escapeHtml(g.groupName)}</label>`;
+      const isChecked = existingGroupIds.has(g.groupId);
+      if (isChecked) selectedGroupIds.push(g.groupId);
+      div.innerHTML = `<input type="checkbox" id="gcb_${g.groupId}" value="${g.groupId}" ${isChecked ? 'checked' : ''}><label for="gcb_${g.groupId}">${escapeHtml(g.groupName)}</label>`;
       groupSelectContainer.appendChild(div);
     }
   }
 
-  // 将新链接添加到所有选中的分组
-  async function syncAddToGroups(linkId) {
-    const checkboxes = groupSelectContainer.querySelectorAll('input[type="checkbox"]:checked');
-    if (!checkboxes.length) return;
+  /** 双向同步链接与分组的关联关系 */
+  async function syncLinkGroups(linkId) {
+    const checkboxes = groupSelectContainer.querySelectorAll('input[type="checkbox"]');
+    const selected = new Set();
     for (const cb of checkboxes) {
+      if (cb.checked) selected.add(cb.value);
+    }
+
+    // 先收集所有现有分组 ID
+    const groups = await loadGroups();
+    const groupIds = new Set(groups.map(g => g.groupId));
+
+    // 从已取消勾选的分组中移除（仅编辑模式）
+    for (const groupId of groupIds) {
+      if (!selected.has(groupId)) {
+        try {
+          await removeLinkFromGroup(groupId, linkId);
+        } catch (e) {
+          console.error(`[popup] 从分组移除链接失败:`, e);
+        }
+      }
+    }
+
+    // 添加到新勾选的分组
+    for (const groupId of selected) {
       try {
-        await addLinkToGroup(cb.value, linkId);
+        await addLinkToGroup(groupId, linkId);
       } catch (e) {
         console.error(`[popup] 添加链接到分组失败:`, e);
       }
@@ -873,15 +906,18 @@ document.addEventListener('DOMContentLoaded', function() {
           renderedCount += 1;
         }
 
-        // 关联分组（仅新增模式）——在 hideEditDialog 之前调用，否则 checkbox 已被清空
-        await syncAddToGroups(addedId);
+        // 关联分组（新增模式）——在 hideEditDialog 之前调用，否则 checkbox 已被清空
+        await syncLinkGroups(addedId);
 
         // 隐藏对话框（放在最后）
         hideEditDialog();
 
         return;
       }
-      
+
+      // 编辑模式：双向同步分组（在 hideEditDialog 之前，此时 checkbox 状态还在）
+      await syncLinkGroups(editingLinkId);
+
       // 编辑模式：隐藏对话框
       hideEditDialog();
       
