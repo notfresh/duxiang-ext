@@ -309,6 +309,20 @@ export async function deleteGroup(groupId) {
   await del(store, groupId);
 }
 
+/**
+ * 切换分组置顶状态
+ * @param {string} groupId 分组ID
+ * @returns {Promise<void>}
+ */
+export async function togglePinGroup(groupId) {
+  const db = await initDB();
+  const store = getStore(db, GROUPS_STORE_NAME, 'readwrite');
+  const group = await get(store, groupId);
+  if (!group) throw new Error('分组不存在');
+  group.pinned = !group.pinned;
+  await put(store, group);
+}
+
 // ==================== 分组引用关联方法 ====================
 
 /**

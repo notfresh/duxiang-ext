@@ -94,6 +94,11 @@ document.addEventListener('DOMContentLoaded', function() {
   let isSearchActive = false;    // 是否处于搜索模式
   let scrollObserver = null;     // IntersectionObserver 实例
   const loadingProgress = document.getElementById('loadingProgress');
+
+  // 置顶分组横条（点击跳转到分组管理页）
+  const pinnedGroupsBar = document.getElementById('pinnedGroupsBar');
+  const pinnedGroupLabel = document.getElementById('pinnedGroupLabel');
+  const pinnedGroupList = document.getElementById('pinnedGroupList');
   
   // 包装工具函数，传入DOM元素
   const showStatusMessage = (message, isError = false) => {
@@ -759,7 +764,32 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     }
   }
-  
+
+  // ========== 置顶分组 ==========
+
+  /** 加载并渲染置顶分组横条 */
+  async function loadAndRenderPinnedGroups() {
+    const groups = await loadGroups();
+    const pinned = (groups || []).filter(g => g.pinned);
+    if (pinned.length === 0) {
+      pinnedGroupsBar.style.display = 'none';
+      return;
+    }
+    pinnedGroupsBar.style.display = 'block';
+    pinnedGroupLabel.textContent = '置顶分组：';
+    pinnedGroupList.innerHTML = '';
+    for (const g of pinned) {
+      const span = document.createElement('span');
+      span.className = 'pinned-group-tag';
+      span.textContent = g.groupName;
+      span.title = g.groupName;
+      span.addEventListener('click', () => {
+        window.location.href = `group.html?groupId=${g.groupId}`;
+      });
+      pinnedGroupList.appendChild(span);
+    }
+  }
+
   // 获取当前标签页信息并打开新增对话框
   async function handleAddLink() {
     try {
@@ -909,6 +939,9 @@ document.addEventListener('DOMContentLoaded', function() {
         // 关联分组（新增模式）——在 hideEditDialog 之前调用，否则 checkbox 已被清空
         await syncLinkGroups(addedId);
 
+        // 刷新置顶分组横条
+        loadAndRenderPinnedGroups();
+
         // 隐藏对话框（放在最后）
         hideEditDialog();
 
@@ -917,6 +950,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
       // 编辑模式：双向同步分组（在 hideEditDialog 之前，此时 checkbox 状态还在）
       await syncLinkGroups(editingLinkId);
+
+      // 刷新置顶分组横条
+      loadAndRenderPinnedGroups();
 
       // 编辑模式：隐藏对话框
       hideEditDialog();
@@ -1664,9 +1700,11 @@ document.addEventListener('DOMContentLoaded', function() {
     iframeOverlay.classList.add('show');
   }
 
-  function closeIframeOverlay() {
+  async function closeIframeOverlay() {
     iframeOverlay.classList.remove('show');
     overlayIframe.src = '';
+    // 子页面可能修改了分组置顶状态，关闭后刷新置顶横条
+    loadAndRenderPinnedGroups();
   }
 
   // 子页面可通过 postMessage 请求关闭 overlay
@@ -1900,6 +1938,8 @@ document.addEventListener('DOMContentLoaded', function() {
     checkAndShowShortcutTip();
     // 刷新历史缓存
     refreshHistoryCache();
+    // 加载置顶分组横条
+    loadAndRenderPinnedGroups();
   }).catch(error => {
     console.error('[popup] 初始加载失败:', error);
   });

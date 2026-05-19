@@ -552,11 +552,27 @@ button:hover {
   color: #333;
 }
 
-/* 搜索框样式 */
+/* 搜索框容器 */
 .search-container {
-  padding: 10px;
+  padding: 6px 10px 8px;
   background-color: #f5f5f5;
   border-bottom: 1px solid #eee;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+  flex-shrink: 0;
+}
+
+#pinnedGroupsBar {
+  overflow-x: auto;
+  white-space: nowrap;
+  min-height: 20px;
+  scrollbar-width: none; /* Firefox */
+}
+
+#pinnedGroupsBar::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
 }
 
 .search-wrapper {

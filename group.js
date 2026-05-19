@@ -14,7 +14,8 @@ import {
   updateGroupLink,
   loadLinks,
   exportGroups,
-  importGroups
+  importGroups,
+  togglePinGroup
 } from './js/storage.js';
 import { loadSettings } from './js/settings.js';
 
@@ -192,6 +193,7 @@ function renderGroups(groups) {
         <span class="group-count">${group.linkIds ? group.linkIds.length : 0} 个链接</span>
       </div>
       <div class="group-actions" onclick="event.stopPropagation()">
+        <button class="action-btn pin-btn" data-action="pin" title="${group.pinned ? '取消置顶' : '置顶'}">${group.pinned ? '📌' : '☆'}</button>
         <button class="action-btn open-all" data-action="open-all" title="批量打开">▶</button>
         <button class="action-btn move-up" data-action="move-up" title="上移" ${index === 0 ? 'disabled' : ''}>↑</button>
         <button class="action-btn move-down" data-action="move-down" title="下移" ${index === sortedGroups.length - 1 ? 'disabled' : ''}>↓</button>
@@ -264,6 +266,22 @@ function renderGroups(groups) {
       e.stopPropagation();
       const index = parseInt(e.target.closest('.group-card').dataset.index);
       await moveGroup(index, index + 1);
+    });
+  });
+
+  // 绑定置顶按钮事件
+  container.querySelectorAll('.action-btn.pin-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const groupId = e.target.closest('.group-card').dataset.groupId;
+      try {
+        await togglePinGroup(groupId);
+        showStatus('已更新置顶状态');
+        await loadGroupsList();
+      } catch (error) {
+        console.error('切换置顶失败:', error);
+        showStatus('操作失败: ' + error.message, true);
+      }
     });
   });
 }
