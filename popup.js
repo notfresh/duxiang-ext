@@ -1,7 +1,7 @@
 // 导入模块
 import { showStatus, log, tagsArrayToString, parseTags, formatDate } from './js/utils.js';
 import { renderLinks, appendLinks, showEmptyState, showSearchEmptyState } from './js/render.js';
-import { loadLinks, loadGroups, loadArchivedLinks, archiveLink, unarchiveLink, deleteLink as deleteLinkFromStorage, updateLink, exportLinks, batchAddLinks, togglePinLink, clearDatabase as clearDatabaseFromStorage, addLink } from './js/storage.js';
+import { loadLinks, loadGroups, loadArchivedLinks, archiveLink, unarchiveLink, deleteLink as deleteLinkFromStorage, updateLink, exportLinks, batchAddLinks, togglePinLink, clearDatabase as clearDatabaseFromStorage, addLink, addLinkToGroup, addGroup } from './js/storage.js';
 import { importBookmarks } from './js/bookmarks.js';
 import { setupSearch } from './js/search.js';
 import { loadSettings, saveSettings, updateCompactModeSettings, generateUUIDv4 } from './js/settings.js';
@@ -39,6 +39,17 @@ document.addEventListener('DOMContentLoaded', function() {
   const editTagsInput = document.getElementById('editTagsInput');
   const editCancelBtn = document.getElementById('editCancelBtn');
   const editSaveBtn = document.getElementById('editSaveBtn');
+
+  // 分组选择相关元素
+  const newGroupBtn = document.getElementById('newGroupBtn');
+  const groupSelectContainer = document.getElementById('groupSelectContainer');
+  const groupDialogOverlay = document.getElementById('groupDialogOverlay');
+  const newGroupNameInput = document.getElementById('newGroupNameInput');
+  const groupCancelBtn = document.getElementById('groupCancelBtn');
+  const groupSaveBtn = document.getElementById('groupSaveBtn');
+
+  // 当前选中的分组 ID 列表
+  let selectedGroupIds = [];
   
   // 设置对话框元素
   const settingsBtn = document.getElementById('settingsBtn');
@@ -680,8 +691,40 @@ document.addEventListener('DOMContentLoaded', function() {
       editUrlInput.value = '';
       editTagsInput.value = '';
     }
+    // 加载并渲染分组选择列表
+    loadAndRenderGroups();
     editDialogOverlay.classList.add('show');
     editTitleInput.focus();
+  }
+
+  // 加载并渲染分组复选框列表
+  async function loadAndRenderGroups() {
+    const groups = await loadGroups();
+    selectedGroupIds = [];
+    groupSelectContainer.innerHTML = '';
+    if (!groups || groups.length === 0) {
+      groupSelectContainer.innerHTML = '<span style="font-size:12px;color:#999;">暂无分组，可新建</span>';
+      return;
+    }
+    for (const g of groups) {
+      const div = document.createElement('div');
+      div.className = 'group-checkbox-item';
+      div.innerHTML = `<input type="checkbox" id="gcb_${g.groupId}" value="${g.groupId}"><label for="gcb_${g.groupId}">${escapeHtml(g.groupName)}</label>`;
+      groupSelectContainer.appendChild(div);
+    }
+  }
+
+  // 将新链接添加到所有选中的分组
+  async function syncAddToGroups(linkId) {
+    const checkboxes = groupSelectContainer.querySelectorAll('input[type="checkbox"]:checked');
+    if (!checkboxes.length) return;
+    for (const cb of checkboxes) {
+      try {
+        await addLinkToGroup(cb.value, linkId);
+      } catch (e) {
+        console.error(`[popup] 添加链接到分组失败:`, e);
+      }
+    }
   }
   
   // 获取当前标签页信息并打开新增对话框
@@ -728,6 +771,11 @@ document.addEventListener('DOMContentLoaded', function() {
     editTitleInput.value = '';
     editUrlInput.value = '';
     editTagsInput.value = '';
+    selectedGroupIds = [];
+    if (groupSelectContainer) {
+      const checkboxes = groupSelectContainer.querySelectorAll('input[type="checkbox"]');
+      checkboxes.forEach(cb => cb.checked = false);
+    }
   }
   
   // 编辑链接处理函数
@@ -827,6 +875,10 @@ document.addEventListener('DOMContentLoaded', function() {
           }
           renderedCount += 1;
         }
+
+        // 关联分组（仅新增模式）
+        await syncAddToGroups(addedId);
+
         return;
       }
       
@@ -909,11 +961,69 @@ document.addEventListener('DOMContentLoaded', function() {
       hideEditDialog();
     }
   });
+
+  // ========== 新建分组弹窗 ==========
+  if (newGroupBtn) {
+    newGroupBtn.addEventListener('click', () => {
+      groupDialogOverlay.classList.add('show');
+      newGroupNameInput.value = '';
+      newGroupNameInput.focus();
+    });
+  }
+
+  if (groupCancelBtn) {
+    groupCancelBtn.addEventListener('click', () => {
+      groupDialogOverlay.classList.remove('show');
+    });
+  }
+
+  if (groupSaveBtn) {
+    groupSaveBtn.addEventListener('click', async () => {
+      const name = newGroupNameInput.value.trim();
+      if (!name) {
+        showStatusMessage('请输入分组名称', true);
+        return;
+      }
+      try {
+        const groupId = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+        await addGroup({ groupId, groupName: name, order: 0, linkIds: [] });
+        showStatusMessage(`已创建分组 "${name}"`);
+        groupDialogOverlay.classList.remove('show');
+        // 重新加载分组列表并自动选中新建的分组
+        await loadAndRenderGroups();
+        const cb = document.getElementById('gcb_' + groupId);
+        if (cb) cb.checked = true;
+      } catch (e) {
+        console.error('[popup] 创建分组失败:', e);
+        showStatusMessage('创建分组失败', true);
+      }
+    });
+  }
+
+  // 点击遮罩层关闭分组弹窗
+  if (groupDialogOverlay) {
+    groupDialogOverlay.addEventListener('click', function(e) {
+      if (e.target === groupDialogOverlay) {
+        groupDialogOverlay.classList.remove('show');
+      }
+    });
+  }
+
+  // 分组输入框按 Enter 直接创建
+  if (newGroupNameInput) {
+    newGroupNameInput.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        groupSaveBtn.click();
+      }
+    });
+  }
   
   // ESC 键关闭对话框或整个弹窗
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
-      if (editDialogOverlay.classList.contains('show')) {
+      if (groupDialogOverlay && groupDialogOverlay.classList.contains('show')) {
+        groupDialogOverlay.classList.remove('show');
+      } else if (editDialogOverlay.classList.contains('show')) {
         hideEditDialog();
       } else if (settingsDialogOverlay.classList.contains('show')) {
         hideSettingsDialog();

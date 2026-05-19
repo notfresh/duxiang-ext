@@ -956,3 +956,29 @@ button:hover {
   background-color: #e0e0e0;
   margin: 0 10px;
 }
+
+/* ========== 分组选择样式 ========== */
+.group-checkbox-item {
+  display: flex;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 13px;
+  color: #333;
+  cursor: pointer;
+}
+
+.group-checkbox-item:hover {
+  background-color: transparent;
+}
+
+.group-checkbox-item input[type="checkbox"] {
+  margin-right: 6px;
+  width: auto;
+  cursor: pointer;
+}
+
+.group-checkbox-item label {
+  cursor: pointer;
+  font-size: 13px;
+  margin-bottom: 0 !important;
+}

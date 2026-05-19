@@ -98,9 +98,30 @@
         <label for="editTagsInput">标签</label>
         <input type="text" id="editTagsInput" placeholder="标签，用逗号分隔">
       </div>
+      <!-- 分组选择 -->
+      <div class="input-group">
+        <label style="font-size:14px;color:#555;font-weight:500;display:block;margin-bottom:6px;">分组：</label>
+        <div id="groupSelectContainer" style="max-height:120px;overflow-y:auto;margin-bottom:6px;"></div>
+        <button id="newGroupBtn" type="button" style="background-color:#FF9800;color:white;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;">+ 新建分组</button>
+      </div>
       <div class="button-group">
         <button id="editCancelBtn" class="cancel-btn">取消</button>
         <button id="editSaveBtn" class="save-btn">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 新建分组弹窗 -->
+  <div id="groupDialogOverlay" class="edit-dialog-overlay">
+    <div class="edit-dialog">
+      <h2>新建分组</h2>
+      <div class="input-group">
+        <label for="newGroupNameInput">分组名称</label>
+        <input type="text" id="newGroupNameInput" placeholder="请输入分组名称">
+      </div>
+      <div class="button-group">
+        <button id="groupCancelBtn" class="cancel-btn">取消</button>
+        <button id="groupSaveBtn" class="save-btn">创建</button>
       </div>
     </div>
   </div>
