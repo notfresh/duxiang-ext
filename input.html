@@ -33,10 +33,20 @@
             text-align: center;
             color: #333;
         }
-        input {
+        input,
+        textarea {
             padding: 5px;
             width: 100%;
             box-sizing: border-box;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        textarea {
+            resize: none;
+            min-height: 36px;
+            overflow-y: hidden;
         }
         button {
             padding: 5px 10px;
@@ -163,12 +173,12 @@
         
         <div class="input-group">
             <label for="titleInput">标题</label>
-            <input type="text" id="titleInput" placeholder="网页标题">
+            <textarea id="titleInput" placeholder="网页标题" rows="2"></textarea>
         </div>
-        
+
         <div class="input-group">
             <label for="urlInput">网址</label>
-            <input type="text" id="urlInput" placeholder="网页链接">
+            <textarea id="urlInput" placeholder="网页链接" rows="2"></textarea>
         </div>
         
         <div class="input-group">

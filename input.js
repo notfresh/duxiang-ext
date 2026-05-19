@@ -28,6 +28,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     console.log('所有DOM元素已获取');
 
+    // Textarea 自适应高度
+    function autoResizeTextarea(el) {
+        el.style.height = 'auto';
+        el.style.height = el.scrollHeight + 'px';
+    }
+    [titleInput, urlInput].forEach(el => {
+        el.addEventListener('input', () => autoResizeTextarea(el));
+    });
+
     // ========== 分组选择 ==========
 
     /** 加载并渲染分组复选框 */
@@ -174,21 +183,21 @@ document.addEventListener('DOMContentLoaded', () => {
     saveButton.addEventListener('click', handleSave);
     console.log('保存按钮点击事件已绑定');
 
-    // 按回车键时保存
-    titleInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            handleSave();
-        }
-    });
+    // Textarea: 用 keydown 拦截回车直接保存，不插入换行符
+    function preventEnterSave(el) {
+        el.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSave();
+            }
+        });
+    }
+    preventEnterSave(titleInput);
+    preventEnterSave(urlInput);
 
-    urlInput.addEventListener('keypress', (e) => {
+    tagsInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
-            handleSave();
-        }
-    });
-
-    tagsInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
+            e.preventDefault();
             handleSave();
         }
     });
