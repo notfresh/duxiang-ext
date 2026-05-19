@@ -842,16 +842,13 @@ document.addEventListener('DOMContentLoaded', function() {
           timestamp: new Date().toISOString(),
           pinned: false
         };
-        
+
         // addLink 返回的是 ID（数字），不是对象
         const addedId = await addLink(newLink);
-        
+
         showStatusMessage('链接已添加');
         logMessage(`添加链接: ${title}`);
-        
-        // 隐藏对话框
-        hideEditDialog();
-        
+
         // 构造完整的链接对象用于更新 loadedLinks 和 DOM
         if (addedId) {
           const addedLink = { ...newLink, id: addedId };
@@ -876,8 +873,11 @@ document.addEventListener('DOMContentLoaded', function() {
           renderedCount += 1;
         }
 
-        // 关联分组（仅新增模式）
+        // 关联分组（仅新增模式）——在 hideEditDialog 之前调用，否则 checkbox 已被清空
         await syncAddToGroups(addedId);
+
+        // 隐藏对话框（放在最后）
+        hideEditDialog();
 
         return;
       }
