@@ -8,6 +8,12 @@
 <body>
   <h1>阅读列表 <span id="helpBtn" title="使用说明">?</span></h1>
   
+  <!-- 置顶分组横条 -->
+  <div id="pinnedGroupsBar" style="display: none; overflow-x: auto; white-space: nowrap; padding: 10px 10px 6px; background-color: #f5f5f5; border-bottom: 1px solid #eee;">
+    <span id="pinnedGroupLabel" style="font-size:12px;color:#999;margin-right:6px;"></span>
+    <span id="pinnedGroupList"></span>
+  </div>
+
   <!-- 搜索框 -->
   <div class="search-container">
     <div class="search-wrapper">
@@ -37,6 +43,19 @@
     <div id="archivedContainer">
       <div class="empty-state">
         <p>暂无已归档的链接</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 分组详情视图 -->
+  <div id="groupDetailView" style="display: none; flex-direction: column; height: 100%;">
+    <div class="header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-shrink: 0;">
+      <button id="backFromGroupBtn" class="back-btn">← 返回</button>
+      <span id="groupDetailTitle"></span>
+    </div>
+    <div id="groupDetailContainer" style="flex: 1; overflow-y: auto; overflow-x: hidden;">
+      <div class="empty-state">
+        <p>该分组暂无链接</p>
       </div>
     </div>
   </div>

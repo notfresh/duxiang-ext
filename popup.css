@@ -982,3 +982,28 @@ button:hover {
   font-size: 13px;
   margin-bottom: 0 !important;
 }
+
+/* ========== 置顶分组横条样式 ========== */
+.pinned-group-tag {
+  display: inline-block;
+  padding: 4px 12px;
+  margin: 0 4px 4px 0;
+  background-color: #e8f5e9;
+  border: 1px solid #a5d6a7;
+  border-radius: 12px;
+  font-size: 13px;
+  color: #2e7d32;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.2s;
+}
+
+.pinned-group-tag:last-child {
+  margin-right: 0;
+}
+
+.pinned-group-tag:hover {
+  background-color: #c8e6c9;
+}
+
+/* End of popup.css */
