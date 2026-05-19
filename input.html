@@ -58,6 +58,103 @@
             font-size: 14px;
             color: #555;
         }
+
+        /* 分组复选框 */
+        .group-checkbox-item {
+            display: flex;
+            align-items: center;
+            padding: 2px 0;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .group-checkbox-item input[type="checkbox"] {
+            margin-right: 6px;
+            width: auto;
+            cursor: pointer;
+        }
+        .group-checkbox-item label {
+            cursor: pointer;
+            font-size: 13px;
+            margin-bottom: 0 !important;
+        }
+        #groupSelectContainer {
+            max-height: 100px;
+            overflow-y: auto;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            padding: 4px 6px;
+            margin-bottom: 6px;
+            background: #fafafa;
+        }
+        .new-group-btn {
+            display: inline-block;
+            padding: 3px 8px;
+            background-color: #FF9800;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+        .new-group-btn:hover {
+            background-color: #e68900;
+        }
+
+        /* 新建分组弹窗 */
+        .group-dialog-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(0,0,0,0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+        .group-dialog-overlay.show {
+            display: flex;
+        }
+        .group-dialog {
+            background: white;
+            padding: 16px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            width: 260px;
+        }
+        .group-dialog h3 {
+            margin: 0 0 12px 0;
+            font-size: 16px;
+            color: #333;
+        }
+        .group-dialog input {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+            box-sizing: border-box;
+            margin-bottom: 10px;
+        }
+        .group-dialog-buttons {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+        .group-dialog-buttons button {
+            padding: 5px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .group-dialog-buttons .cancel {
+            background: #f5f5f5;
+            color: #333;
+        }
+        .group-dialog-buttons .create {
+            background: #4CAF50;
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -78,9 +175,29 @@
             <label for="tagsInput">标签</label>
             <input type="text" id="tagsInput" placeholder="添加标签，用逗号分隔">
         </div>
-        
+
+        <!-- 分组选择 -->
+        <div class="input-group">
+            <label for="groupSelectContainer">分组</label>
+            <div id="groupSelectContainer"></div>
+            <button id="newGroupBtn" type="button" class="new-group-btn">+ 新建分组</button>
+        </div>
+
         <button id="saveButton">保存</button>
     </div>
+
+    <!-- 新建分组弹窗 -->
+    <div id="groupDialogOverlay" class="group-dialog-overlay">
+        <div class="group-dialog">
+            <h3>新建分组</h3>
+            <input type="text" id="newGroupNameInput" placeholder="请输入分组名称">
+            <div class="group-dialog-buttons">
+                <button id="groupCancelBtn" class="cancel">取消</button>
+                <button id="groupSaveBtn" class="create">创建</button>
+            </div>
+        </div>
+    </div>
+
     <script type="module" src="input.js"></script>
 </body>
 </html> 
