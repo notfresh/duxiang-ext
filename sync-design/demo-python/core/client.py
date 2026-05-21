@@ -24,23 +24,23 @@ class SyncClient:
         触发时机：启动时、定时兜底、收到对端"有新数据"通知时
         """
         provider = self.registry.get_provider(entity_type)
-        
+
         # 1. 读游标：我上次从这个 peer 成功拉到的时间点
         cursor = self.cursor_manager.get_pull_cursor(peer_id, entity_type)
-        
+
         # 2. 向对端 Server 请求增量数据
         response = self.transport.get(peer_id, "/sync/pull", {
             'entityType': entity_type,
             'lastCursor': cursor
         })
-        
+
         if not response.success:
-            print(f"❌ pull failed from {peer_id}: {response.error}")
+            print(f"[ERR] Pull failed from {peer_id}: {response.error}")
             return  # 不更新游标，下次从同一游标重试
-        
+
         # 获取实体类，用于反序列化
         entity_class = self._get_entity_class(entity_type)
-        package = SyncPullResponse.from_dict(response.data, entity_class)
+        package = SyncPullResponse.from_dict(response.data['data'], entity_class)
         
         # 3. 按 logTimestamp 升序应用数据（幂等）
         for item in package.items:
@@ -56,7 +56,7 @@ class SyncClient:
         # 4. 数据写入本地成功后，才推进游标
         if package.next_cursor > cursor:
             self.cursor_manager.save_pull_cursor(peer_id, entity_type, package.next_cursor)
-            print(f"✅ pull from {peer_id}: {len(package.items)} items, cursor -> {package.next_cursor}")
+            print(f"[OK] Pull from {peer_id}: {len(package.items)} items, cursor -> {package.next_cursor}")
     
     def push(self, peer_id: str, entity_type: str) -> None:
         """
@@ -96,9 +96,9 @@ class SyncClient:
         if response.success and response.data.get('success'):
             ack_timestamp = response.data.get('serverAckTimestamp', 0)
             self.cursor_manager.save_push_cursor(peer_id, entity_type, ack_timestamp)
-            print(f"✅ push to {peer_id}: {len(items)} items, cursor -> {ack_timestamp}")
+            print(f"[OK] Push to {peer_id}: {len(items)} items, cursor -> {ack_timestamp}")
         else:
-            print(f"❌ push failed to {peer_id}, will retry from cursor: {cursor}")
+            print(f"[ERR] Push failed to {peer_id}, will retry from cursor: {cursor}")
     
     def sync_with_peer(self, peer_id: str, entity_type: str) -> None:
         """

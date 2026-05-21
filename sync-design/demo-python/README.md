@@ -27,44 +27,41 @@ demo-python/
 ├── examples/           # 示例实现
 │   ├── bookmark.py            # Bookmark 实体和日志
 │   ├── bookmark_provider.py  # BookmarkProvider 实现
-│   └── mock_transport.py     # Mock 网络传输层
+│   ├── http_transport.py     # HTTP 网络传输层
+│   └── sync_http_server.py   # HTTP 同步服务器
 │
-├── demo.py            # 可运行的演示脚本
+├── demo.py            # 交互式节点启动脚本
 └── README.md          # 本文件
 ```
 
 ## 🚀 快速开始
 
-### 运行 Demo
+### 启动两个独立节点
+
+在两个终端分别运行：
 
 ```bash
+# 终端 1 - 节点 A (端口 8001)
 cd sync-design/demo-python
-python demo.py
+python demo.py --node node-a --port 8001 --peer node-b http://localhost:8002
+
+# 终端 2 - 节点 B (端口 8002)
+cd sync-design/demo-python
+python demo.py --node node-b --port 8002 --peer node-a http://localhost:8001
 ```
 
-Demo 将演示以下场景：
-1. **基本的双向同步** - 两个节点互相 pull 数据
-2. **冲突解决（LWW）** - Last-Write-Wins 策略
-3. **删除操作同步** - DELETE 操作的传播
-4. **Push 操作** - 主动推送变更到对端
-5. **syncWithPeer** - Pull + Push 组合操作
-
-### 查看生成的数据
-
-运行后会在 `./data/` 目录下生成 JSON 文件：
+每个节点启动后进入交互式命令行，可执行：
 
 ```
-data/
-├── node-a/
-│   ├── bookmarks_node-a.json    # 节点 A 的书签数据
-│   ├── sync_log_node-a.json     # 节点 A 的同步日志
-│   └── cursors_node-a.json      # 节点 A 的游标
-│
-└── node-b/
-    ├── bookmarks_node-b.json
-    ├── sync_log_node-b.json
-    └── cursors_node-b.json
+[node-a]> create bk-1 https://github.com GitHub
+[node-a]> list
+[node-a]> pull node-b          # 从 node-b 拉取
+[node-a]> push node-b          # 推送到 node-b
+[node-a]> sync node-b          # 完整同步 (pull+push)
+[node-a]> quit
 ```
+
+数据存储在 `./nodes/<node-id>/` 目录下，每个实例独立管理自己的数据。
 
 ## 🏗️ 核心设计
 
@@ -109,10 +106,10 @@ class ISyncProvider(ABC, Generic[T]):
 ```python
 from storage import JsonStorage, JsonCursorManager
 from core import SyncRegistry, SyncClient, SyncServer, SyncEngine, SyncEngineOptions
-from examples import BookmarkProvider, MockTransport
+from examples import BookmarkProvider, HttpTransport
 
 # 1. 创建存储和游标管理器
-storage = JsonStorage("./data/node-a")
+storage = JsonStorage("./nodes/node-a")
 cursor_manager = JsonCursorManager(storage, "node-a")
 
 # 2. 创建注册中心并注册 Provider
@@ -121,7 +118,8 @@ provider = BookmarkProvider(storage, "node-a")
 registry.register("BOOKMARK", provider)
 
 # 3. 创建 Client 和 Server
-transport = MockTransport()
+transport = HttpTransport()
+transport.register_peer("node-b", "http://localhost:8002")
 client = SyncClient(registry, cursor_manager, transport)
 server = SyncServer(registry)
 
@@ -290,8 +288,7 @@ Demo 中包含以下测试场景：
 ## 🎯 扩展建议
 
 1. **实际数据库**: 替换 `JsonStorage` 为 SQLite / PostgreSQL
-2. **HTTP Transport**: 实现真实的 HTTP 客户端/服务器
-3. **批量处理**: 添加分页和批量大小限制
+2. **批量处理**: 添加分页和批量大小限制
 4. **错误重试**: 添加指数退避重试机制
 5. **监控指标**: 添加同步延迟、冲突率等指标
 6. **压缩传输**: 添加 gzip 压缩支持

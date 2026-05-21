@@ -66,7 +66,7 @@ class SyncServer:
                     max_timestamp = item.log_timestamp
                     
             except Exception as error:
-                print(f"❌ Failed to apply item: {item.entity_id}, error: {error}")
+                print(f"ERR Failed to apply item: {item.entity_id}, error: {error}")
                 # 失败立即返回；Client 不推进游标，下次从同一 cursor 重试整批数据
                 return SyncPushResponse(
                     success=False,

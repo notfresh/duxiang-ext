@@ -18,7 +18,7 @@ class SyncRegistry:
             raise ValueError(f"类型已存在: {entity_type}")
         
         self._providers[entity_type] = provider
-        print(f"✅ 注册同步器: {entity_type}")
+        print(f"[OK] Register syncer: {entity_type}")
     
     def get_provider(self, entity_type: str) -> ISyncProvider:
         """获取提供者"""

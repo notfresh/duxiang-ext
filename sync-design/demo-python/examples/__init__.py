@@ -1,6 +1,7 @@
 """示例模块"""
 from .bookmark import Bookmark, BookmarkSyncLog
 from .bookmark_provider import BookmarkProvider
-from .mock_transport import MockTransport
+from .http_transport import HttpTransport
+from .sync_http_server import start_http_server
 
-__all__ = ['Bookmark', 'BookmarkSyncLog', 'BookmarkProvider', 'MockTransport']
+__all__ = ['Bookmark', 'BookmarkSyncLog', 'BookmarkProvider', 'HttpTransport', 'start_http_server']

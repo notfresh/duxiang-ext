@@ -26,7 +26,7 @@ class JsonStorage:
             with open(file_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except Exception as e:
-            print(f"⚠️ 加载文件失败 {filename}: {e}")
+            print(f"[WARN] Load file failed {filename}: {e}")
             return {}
     
     def save(self, filename: str, data: Dict[str, Any]) -> None:
@@ -36,7 +36,7 @@ class JsonStorage:
             with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            print(f"❌ 保存文件失败 {filename}: {e}")
+            print(f"[ERROR] Save file failed {filename}: {e}")
             raise
     
     def load_list(self, filename: str) -> List[Any]:
@@ -49,7 +49,7 @@ class JsonStorage:
             with open(file_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except Exception as e:
-            print(f"⚠️ 加载文件失败 {filename}: {e}")
+            print(f"[WARN] Load file failed {filename}: {e}")
             return []
     
     def save_list(self, filename: str, data: List[Any]) -> None:
@@ -59,5 +59,5 @@ class JsonStorage:
             with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            print(f"❌ 保存文件失败 {filename}: {e}")
+            print(f"[ERROR] Save file failed {filename}: {e}")
             raise

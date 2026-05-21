@@ -1,317 +1,171 @@
 #!/usr/bin/env python3
 """
-UniversalSyncEngine Demo
-演示 P2P 同步引擎的基本功能
+UniversalSyncEngine - 交互式节点启动器
+
+用法:
+  python demo.py --node node-a --port 8001 --peer node-b http://localhost:8002
+  python demo.py --node node-b --port 8002 --peer node-a http://localhost:8001
+
+每个实例启动后进入交互式命令行，可执行:
+  list / create <id> <url> <title> / delete <id>
+  pull <peer> / push <peer> / sync <peer> / quit
 """
+import argparse
+import sys
+import threading
 import time
 from storage import JsonStorage, JsonCursorManager
 from core import SyncRegistry, SyncClient, SyncServer, SyncEngine, SyncEngineOptions
-from examples import Bookmark, BookmarkProvider, MockTransport
+from examples import Bookmark, BookmarkProvider, HttpTransport, start_http_server
 
 
-def print_section(title: str):
-    """打印分隔线"""
-    print(f"\n{'=' * 60}")
-    print(f"  {title}")
-    print('=' * 60)
-
-
-def create_node(node_id: str, transport: MockTransport, 
+def create_node(node_id: str, transport: HttpTransport, data_dir: str,
                 client_enabled: bool = True, server_enabled: bool = True) -> tuple:
     """创建一个同步节点"""
-    # 1. 创建存储和游标管理器
-    storage = JsonStorage(f"./data/{node_id}")
+    storage = JsonStorage(f"{data_dir}/{node_id}")
     cursor_manager = JsonCursorManager(storage, node_id)
-    
-    # 2. 创建注册中心并注册 Provider
+
     registry = SyncRegistry()
     provider = BookmarkProvider(storage, node_id)
     registry.register("BOOKMARK", provider)
-    
-    # 3. 创建 Client 和 Server
+
     client = SyncClient(registry, cursor_manager, transport) if client_enabled else None
     server = SyncServer(registry) if server_enabled else None
-    
-    # 4. 创建引擎
+
     options = SyncEngineOptions(
         client_enabled=client_enabled,
         server_enabled=server_enabled
     )
     engine = SyncEngine(options, client, server)
-    
+
     return engine, provider
 
 
-def demo_basic_sync():
-    """演示基本的 P2P 同步"""
-    print_section("演示 1: 基本的双向同步")
-    
-    # 创建 Mock 传输层（模拟网络）
-    transport = MockTransport()
-    
-    # 创建两个节点
-    print("\n🔧 创建节点 A 和节点 B...")
-    engine_a, provider_a = create_node("node-a", transport)
-    engine_b, provider_b = create_node("node-b", transport)
-    
-    # 注册到传输层
-    transport.register_engine("node-a", engine_a)
-    transport.register_engine("node-b", engine_b)
-    
-    # 节点互相注册为 peer
-    engine_a.register_peer("node-b")
-    engine_b.register_peer("node-a")
-    
-    # 节点 A 创建一些书签
-    print("\n📚 节点 A 创建书签...")
-    provider_a.create_bookmark(Bookmark(
-        bookmark_id="bk-1",
-        url="https://github.com",
-        title="GitHub",
-        updated_at=int(time.time() * 1000)
-    ))
-    time.sleep(0.01)  # 确保时间戳不同
-    
-    provider_a.create_bookmark(Bookmark(
-        bookmark_id="bk-2",
-        url="https://python.org",
-        title="Python",
-        updated_at=int(time.time() * 1000)
-    ))
-    
-    print(f"  节点 A 书签数: {len(provider_a.list_all())}")
-    print(f"  节点 B 书签数: {len(provider_b.list_all())}")
-    
-    # 节点 B 从节点 A 拉取数据
-    print("\n🔄 节点 B pull 节点 A 的数据...")
-    engine_b.pull("node-a", "BOOKMARK")
-    
-    print(f"  节点 B 书签数: {len(provider_b.list_all())}")
-    for bm in provider_b.list_all():
-        print(f"    - {bm}")
-    
-    # 节点 B 创建新书签
-    print("\n📚 节点 B 创建书签...")
-    provider_b.create_bookmark(Bookmark(
-        bookmark_id="bk-3",
-        url="https://stackoverflow.com",
-        title="Stack Overflow",
-        updated_at=int(time.time() * 1000)
-    ))
-    
-    # 节点 A 从节点 B 拉取
-    print("\n🔄 节点 A pull 节点 B 的数据...")
-    engine_a.pull("node-b", "BOOKMARK")
-    
-    print(f"  节点 A 书签数: {len(provider_a.list_all())}")
-    for bm in provider_a.list_all():
-        print(f"    - {bm}")
+def print_help():
+    print("\n  命令:")
+    print("    list                          - 列出所有书签")
+    print("    create <id> <url> <title>     - 创建书签")
+    print("    delete <id>                   - 删除书签")
+    print("    pull <peer>                   - 从 peer 拉取")
+    print("    push <peer>                   - 推送到 peer")
+    print("    sync <peer>                   - 完整同步 (pull+push)")
+    print("    status                        - 查看节点状态")
+    print("    quit                          - 退出")
 
 
-def demo_conflict_resolution():
-    """演示冲突解决（LWW）"""
-    print_section("演示 2: 冲突解决（Last-Write-Wins）")
-    
-    transport = MockTransport()
-    
-    print("\n🔧 创建节点 A 和节点 B...")
-    engine_a, provider_a = create_node("node-a", transport)
-    engine_b, provider_b = create_node("node-b", transport)
-    
-    transport.register_engine("node-a", engine_a)
-    transport.register_engine("node-b", engine_b)
-    
-    engine_a.register_peer("node-b")
-    engine_b.register_peer("node-a")
-    
-    # 两个节点都创建相同 ID 的书签
-    print("\n📚 节点 A 和节点 B 创建相同 ID 的书签...")
-    
-    timestamp_a = int(time.time() * 1000)
-    provider_a.create_bookmark(Bookmark(
-        bookmark_id="bk-conflict",
-        url="https://a.com",
-        title="Version A",
-        updated_at=timestamp_a
-    ))
-    
-    time.sleep(0.1)  # 确保 B 的时间戳更晚
-    timestamp_b = int(time.time() * 1000)
-    provider_b.create_bookmark(Bookmark(
-        bookmark_id="bk-conflict",
-        url="https://b.com",
-        title="Version B (newer)",
-        updated_at=timestamp_b
-    ))
-    
-    print(f"  节点 A: {provider_a.get_entity_by_id('bk-conflict')}")
-    print(f"  节点 B: {provider_b.get_entity_by_id('bk-conflict')}")
-    
-    # 节点 A pull 节点 B（B 的版本更新，应该覆盖 A）
-    print("\n🔄 节点 A pull 节点 B（LWW 生效）...")
-    engine_a.pull("node-b", "BOOKMARK")
-    
-    result = provider_a.get_entity_by_id("bk-conflict")
-    print(f"  节点 A 最终版本: {result}")
-    print(f"  ✅ 冲突解决: 保留了更新的版本（Version B）")
+def interactive_loop(engine, provider, transport, node_id):
+    """交互式命令行"""
+    print(f"\nNode [{node_id}] 已启动，输入 'help' 查看命令")
+    print_help()
 
+    while True:
+        try:
+            cmd = input(f"\n[{node_id}]> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\n[QUIT]")
+            break
 
-def demo_delete_sync():
-    """演示删除操作同步"""
-    print_section("演示 3: 删除操作同步")
-    
-    transport = MockTransport()
-    
-    print("\n🔧 创建节点 A 和节点 B...")
-    engine_a, provider_a = create_node("node-a", transport)
-    engine_b, provider_b = create_node("node-b", transport)
-    
-    transport.register_engine("node-a", engine_a)
-    transport.register_engine("node-b", engine_b)
-    
-    engine_a.register_peer("node-b")
-    engine_b.register_peer("node-a")
-    
-    # 节点 A 创建书签
-    print("\n📚 节点 A 创建书签...")
-    provider_a.create_bookmark(Bookmark(
-        bookmark_id="bk-delete",
-        url="https://example.com",
-        title="To Be Deleted",
-        updated_at=int(time.time() * 1000)
-    ))
-    
-    # 同步到节点 B
-    print("\n🔄 同步到节点 B...")
-    engine_b.pull("node-a", "BOOKMARK")
-    print(f"  节点 B 书签数: {len(provider_b.list_all())}")
-    
-    # 节点 A 删除书签
-    print("\n🗑️ 节点 A 删除书签...")
-    provider_a.delete_bookmark("bk-delete")
-    print(f"  节点 A 书签数: {len(provider_a.list_all())}")
-    
-    # 节点 B 再次同步
-    print("\n🔄 节点 B 再次 pull...")
-    engine_b.pull("node-a", "BOOKMARK")
-    print(f"  节点 B 书签数: {len(provider_b.list_all())}")
-    print(f"  ✅ 删除操作已同步")
+        if not cmd:
+            continue
 
+        parts = cmd.split()
+        action = parts[0].lower()
 
-def demo_push_operation():
-    """演示 push 操作"""
-    print_section("演示 4: Push 操作")
-    
-    transport = MockTransport()
-    
-    print("\n🔧 创建节点 A 和节点 B...")
-    engine_a, provider_a = create_node("node-a", transport)
-    engine_b, provider_b = create_node("node-b", transport)
-    
-    transport.register_engine("node-a", engine_a)
-    transport.register_engine("node-b", engine_b)
-    
-    engine_a.register_peer("node-b")
-    engine_b.register_peer("node-a")
-    
-    # 节点 A 创建书签
-    print("\n📚 节点 A 创建书签...")
-    provider_a.create_bookmark(Bookmark(
-        bookmark_id="bk-push",
-        url="https://push-demo.com",
-        title="Push Demo",
-        updated_at=int(time.time() * 1000)
-    ))
-    
-    print(f"  节点 A 书签数: {len(provider_a.list_all())}")
-    print(f"  节点 B 书签数: {len(provider_b.list_all())}")
-    
-    # 节点 A 主动 push 到节点 B
-    print("\n📤 节点 A push 到节点 B...")
-    engine_a.push("node-b", "BOOKMARK")
-    
-    print(f"  节点 B 书签数: {len(provider_b.list_all())}")
-    for bm in provider_b.list_all():
-        print(f"    - {bm}")
+        if action == "quit" or action == "exit":
+            print("[QUIT]")
+            break
 
+        elif action == "help":
+            print_help()
 
-def demo_sync_with_peer():
-    """演示 syncWithPeer（pull + push 组合）"""
-    print_section("演示 5: syncWithPeer (Pull + Push 组合)")
-    
-    transport = MockTransport()
-    
-    print("\n🔧 创建节点 A 和节点 B...")
-    engine_a, provider_a = create_node("node-a", transport)
-    engine_b, provider_b = create_node("node-b", transport)
-    
-    transport.register_engine("node-a", engine_a)
-    transport.register_engine("node-b", engine_b)
-    
-    engine_a.register_peer("node-b")
-    engine_b.register_peer("node-a")
-    
-    # 节点 A 创建书签
-    print("\n📚 节点 A 创建书签...")
-    provider_a.create_bookmark(Bookmark(
-        bookmark_id="bk-a1",
-        url="https://a1.com",
-        title="From A",
-        updated_at=int(time.time() * 1000)
-    ))
-    
-    # 节点 B 创建书签
-    print("\n📚 节点 B 创建书签...")
-    provider_b.create_bookmark(Bookmark(
-        bookmark_id="bk-b1",
-        url="https://b1.com",
-        title="From B",
-        updated_at=int(time.time() * 1000)
-    ))
-    
-    print(f"\n  同步前:")
-    print(f"    节点 A 书签数: {len(provider_a.list_all())}")
-    print(f"    节点 B 书签数: {len(provider_b.list_all())}")
-    
-    # 节点 A 执行完整同步
-    print("\n🔄 节点 A syncWithPeer 节点 B (pull + push)...")
-    engine_a.sync_with_peer("node-b", "BOOKMARK")
-    
-    print(f"\n  同步后:")
-    print(f"    节点 A 书签数: {len(provider_a.list_all())}")
-    print(f"    节点 B 书签数: {len(provider_b.list_all())}")
-    
-    print("\n  节点 A 的书签:")
-    for bm in provider_a.list_all():
-        print(f"    - {bm}")
-    
-    print("\n  节点 B 的书签:")
-    for bm in provider_b.list_all():
-        print(f"    - {bm}")
+        elif action == "list":
+            items = provider.list_all()
+            if items:
+                print(f"  共 {len(items)} 条书签:")
+                for bm in items:
+                    print(f"    - {bm}")
+            else:
+                print("  (空)")
+
+        elif action == "create" and len(parts) >= 4:
+            bm_id = parts[1]
+            url = parts[2]
+            title = " ".join(parts[3:])
+            provider.create_bookmark(Bookmark(
+                bookmark_id=bm_id,
+                url=url,
+                title=title,
+                updated_at=int(time.time() * 1000)
+            ))
+
+        elif action == "delete" and len(parts) >= 2:
+            provider.delete_bookmark(parts[1])
+
+        elif action == "pull" and len(parts) >= 2:
+            engine.pull(parts[1], "BOOKMARK")
+
+        elif action == "push" and len(parts) >= 2:
+            engine.push(parts[1], "BOOKMARK")
+
+        elif action == "sync" and len(parts) >= 2:
+            engine.sync_with_peer(parts[1], "BOOKMARK")
+
+        elif action == "status":
+            print(f"  节点: {node_id}")
+            print(f"  已知 peers: {engine.get_known_peers()}")
+            print(f"  书签数: {len(provider.list_all())}")
+
+        else:
+            print(f"  [?] 未知命令: {cmd}，输入 'help' 查看帮助")
 
 
 def main():
-    """主函数"""
-    print("\n" + "=" * 60)
-    print("  UniversalSyncEngine - Python Demo")
-    print("  基于时间的 P2P 增量同步引擎")
-    print("=" * 60)
-    
-    try:
-        # 运行所有演示
-        demo_basic_sync()
-        demo_conflict_resolution()
-        demo_delete_sync()
-        demo_push_operation()
-        demo_sync_with_peer()
-        
-        print_section("✅ 所有演示完成")
-        print("\n💡 提示: 查看 ./data/ 目录可以看到生成的 JSON 文件")
-        
-    except Exception as e:
-        print(f"\n❌ 错误: {e}")
-        import traceback
-        traceback.print_exc()
+    parser = argparse.ArgumentParser(description="UniversalSyncEngine 交互式节点")
+    parser.add_argument("--node", required=True, help="节点 ID")
+    parser.add_argument("--port", type=int, default=8000, help="HTTP 服务端口")
+    parser.add_argument("--host", default="0.0.0.0", help="HTTP 服务地址")
+    parser.add_argument("--peer", nargs=2, action="append",
+                        metavar=("PEER_ID", "URL"),
+                        help="注册 peer (可多次使用)")
+    parser.add_argument("--data-dir", default="./nodes", help="数据目录")
+    args = parser.parse_args()
+
+    print(f"\n{'=' * 50}")
+    print(f"  节点: {args.node}")
+    print(f"  地址: {args.host}:{args.port}")
+    print(f"  数据: {args.data_dir}/{args.node}")
+    print(f"{'=' * 50}")
+
+    # 创建传输层
+    transport = HttpTransport()
+
+    # 注册 peers
+    if args.peer:
+        for peer_id, peer_url in args.peer:
+            transport.register_peer(peer_id, peer_url)
+
+    # 创建节点
+    engine, provider = create_node(
+        node_id=args.node,
+        transport=transport,
+        data_dir=args.data_dir,
+    )
+
+    # 引擎侧也注册 peer
+    if args.peer:
+        for peer_id, _ in args.peer:
+            engine.register_peer(peer_id)
+
+    # 启动 HTTP 服务器（后台线程）
+    server = start_http_server(args.host, args.port, engine)
+    server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+    server_thread.start()
+
+    # 进入交互式循环
+    interactive_loop(engine, provider, transport, args.node)
+
+    # 退出时关闭服务器
+    server.shutdown()
 
 
 if __name__ == "__main__":

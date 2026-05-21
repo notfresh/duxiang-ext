@@ -85,7 +85,7 @@ class BookmarkProvider(ISyncProvider[Bookmark]):
             payload=bookmark
         )
         self.upsert_with_log(bookmark, log)
-        print(f"📝 CREATE: {bookmark}")
+        print(f"[CREATE] {bookmark}")
     
     def update_bookmark(self, bookmark: Bookmark) -> None:
         """业务方法：更新书签（带日志）"""
@@ -95,7 +95,7 @@ class BookmarkProvider(ISyncProvider[Bookmark]):
             payload=bookmark
         )
         self.upsert_with_log(bookmark, log)
-        print(f"✏️ UPDATE: {bookmark}")
+        print(f"[UPDATE] {bookmark}")
     
     def delete_bookmark(self, bookmark_id: str) -> None:
         """业务方法：删除书签（带日志）"""
@@ -105,7 +105,7 @@ class BookmarkProvider(ISyncProvider[Bookmark]):
             payload=None
         )
         self.delete_with_log(bookmark_id, log)
-        print(f"🗑️ DELETE: {bookmark_id}")
+        print(f":DELETE: {bookmark_id}")
     
     def list_all(self) -> List[Bookmark]:
         """列出所有书签"""

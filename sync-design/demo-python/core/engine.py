@@ -40,7 +40,7 @@ class SyncEngine:
         """注册对等节点"""
         if peer_id not in self.known_peers:
             self.known_peers.append(peer_id)
-            print(f"📋 注册 peer: {peer_id}")
+            print(f"[*] 注册 peer: {peer_id}")
     
     def unregister_peer(self, peer_id: str) -> None:
         """注销对等节点"""
@@ -70,21 +70,21 @@ class SyncEngine:
     def pull(self, peer_id: str, entity_type: str) -> None:
         """单独 pull：按需拉取某个 peer 的增量数据"""
         if not self.options.client_enabled:
-            print("⚠️ Client feature is disabled")
+            print("[WARN] Client feature is disabled")
             return
         self.client.pull(peer_id, entity_type)
     
     def push(self, peer_id: str, entity_type: str) -> None:
         """单独 push：按需将本地变更推送给某个 peer"""
         if not self.options.client_enabled:
-            print("⚠️ Client feature is disabled")
+            print("[WARN] Client feature is disabled")
             return
         self.client.push(peer_id, entity_type)
     
     def pull_all(self, entity_type: str) -> None:
         """按当前已知 peer 列表执行一轮 pull"""
         if not self.options.client_enabled:
-            print("⚠️ Client feature is disabled")
+            print("[WARN] Client feature is disabled")
             return
         for peer_id in self.known_peers:
             self.client.pull(peer_id, entity_type)
@@ -92,6 +92,6 @@ class SyncEngine:
     def sync_with_peer(self, peer_id: str, entity_type: str) -> None:
         """组合同步：pull + push 的显式便捷包装"""
         if not self.options.client_enabled:
-            print("⚠️ Client feature is disabled")
+            print("[WARN] Client feature is disabled")
             return
         self.client.sync_with_peer(peer_id, entity_type)
