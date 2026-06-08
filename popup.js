@@ -586,6 +586,11 @@ document.addEventListener('DOMContentLoaded', function() {
       searchInput.value = keyword;
       searchHistoryDropdown.style.display = 'none';
 
+      // 程序化赋值不会触发 input 事件，需手动同步清除按钮可见性
+      if (clearSearchBtn) {
+        clearSearchBtn.style.display = 'block';
+      }
+
       // 触发搜索并记录
       await addSearchKeyword(keyword);
       const { searchLinks } = await import('./js/search.js');
@@ -604,6 +609,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // 记录搜索历史（有搜索内容时）
     if (searchText && searchText.trim()) {
       await addSearchKeyword(searchText.trim());
+      // 刷新内存中的历史缓存，保证下次打开下拉能看到刚键入的词
+      await refreshHistoryCache();
     }
 
     if (searchText) {
