@@ -1,7 +1,7 @@
 """同步日志接口定义"""
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Optional
+from typing import List, Optional
 from .entity import ISyncEntity
 
 
@@ -10,6 +10,7 @@ class Operation(Enum):
     CREATE = "CREATE"
     UPDATE = "UPDATE"
     DELETE = "DELETE"
+    BATCH_CREATE = "BATCH_CREATE"  # 批量初始化日志
 
 
 class ISyncLog(ABC):
@@ -27,12 +28,12 @@ class ISyncLog(ABC):
     
     @abstractmethod
     def get_operation(self) -> Operation:
-        """操作类型: CREATE | UPDATE | DELETE"""
+        """操作类型: CREATE | UPDATE | DELETE | BATCH_CREATE"""
         pass
-    
+
     @abstractmethod
-    def get_timestamp(self) -> int:
-        """日志写入时间戳（毫秒），游标的唯一依据"""
+    def get_seq(self) -> int:
+        """实体的序列号（节点本地序列号），游标推进依据"""
         pass
     
     @abstractmethod
@@ -49,4 +50,18 @@ class ISyncLog(ABC):
     @abstractmethod
     def from_dict(cls, data: dict, entity_class: type) -> 'ISyncLog':
         """从字典反序列化"""
+        pass
+
+
+class IBatchLog(ISyncLog):
+    """批量日志接口 - 用于初始化时批量同步存量数据"""
+
+    @abstractmethod
+    def get_entities(self) -> List[ISyncEntity]:
+        """获取批量实体列表"""
+        pass
+
+    @abstractmethod
+    def get_operation(self) -> Operation:
+        """固定返回 BATCH_CREATE"""
         pass
