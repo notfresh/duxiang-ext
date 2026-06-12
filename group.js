@@ -134,8 +134,9 @@ function showGroupsListView() {
 
 // 显示组内视图
 function showGroupView() {
+  const fromHome = urlParams.get('from') === 'home';
   backBtn.style.display = 'block';
-  homeBtn.style.display = 'none';
+  homeBtn.style.display = fromHome ? 'block' : 'none';
   openAllBtn.style.display = 'block';
   addLinkBtn.style.display = 'block';
   searchContainer.style.display = 'block';
