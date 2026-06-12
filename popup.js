@@ -791,7 +791,7 @@ document.addEventListener('DOMContentLoaded', function() {
       span.textContent = g.groupName;
       span.title = g.groupName;
       span.addEventListener('click', () => {
-        window.location.href = `group.html?groupId=${g.groupId}`;
+        window.location.href = `group.html?groupId=${g.groupId}&from=home`;
       });
       pinnedGroupList.appendChild(span);
     }
