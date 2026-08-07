@@ -1767,22 +1767,16 @@ document.addEventListener('DOMContentLoaded', function() {
   // 同步推送按钮
   if (syncPushBtn) {
     syncPushBtn.addEventListener('click', async () => {
-      const peerUrl = syncPeerUrlInput ? syncPeerUrlInput.value.trim() : '';
-      if (!peerUrl) {
-        if (syncStatusText) syncStatusText.textContent = '请先输入对端 URL';
-        return;
-      }
-      if (syncStatusText) syncStatusText.textContent = '正在推送...';
+      if (syncStatusText) syncStatusText.textContent = '正在同步...';
       try {
-        const res = await chrome.runtime.sendMessage({ type: 'sync.push', peerId: peerUrl, entityType: 'LINK' });
+        const res = await chrome.runtime.sendMessage({ type: 'simple-sync' });
         if (res && res.success) {
-          const ack = res.ackCursor || '-';
-          if (syncStatusText) syncStatusText.textContent = `推送成功，ackCursor: ${ack}`;
+          if (syncStatusText) syncStatusText.textContent = res.message || '同步成功';
         } else {
-          if (syncStatusText) syncStatusText.textContent = `推送失败: ${res?.reason || '未知错误'}`;
+          if (syncStatusText) syncStatusText.textContent = `同步失败: ${res?.message || '未知错误'}`;
         }
       } catch (e) {
-        if (syncStatusText) syncStatusText.textContent = '推送异常: ' + e.message;
+        if (syncStatusText) syncStatusText.textContent = '同步异常: ' + e.message;
       }
     });
   }
