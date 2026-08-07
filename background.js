@@ -3,6 +3,9 @@ console.log('[background] ========== Service Worker 已启动 ==========');
 console.log('[background] 时间:', new Date().toISOString());
 console.log('[background] 扩展 ID:', chrome.runtime.id);
 
+// 静态导入 simple-sync 模块
+import { simpleSync, simplePull } from './js/simple-sync.js';
+
 // initialize sync runtime and mount router (non-blocking)
 try {
     import('./js/sync/bootstrap.js').then(async (mod) => {
@@ -89,9 +92,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'simple-sync') {
     (async () => {
       try {
-        const { simpleSync } = await import('./js/simple-sync.js');
-        const settings = await import('./js/settings.js');
-        const userSettings = await settings.loadSettings();
+        const { loadSettings } = await import('./js/settings.js');
+        const userSettings = await loadSettings();
         const peerUrl = userSettings.syncPeerUrl;
 
         if (!peerUrl) {
@@ -113,9 +115,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'simple-pull') {
     (async () => {
       try {
-        const { simplePull } = await import('./js/simple-sync.js');
-        const settings = await import('./js/settings.js');
-        const userSettings = await settings.loadSettings();
+        const { loadSettings } = await import('./js/settings.js');
+        const userSettings = await loadSettings();
         const peerUrl = userSettings.syncPeerUrl;
 
         if (!peerUrl) {
