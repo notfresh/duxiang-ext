@@ -23,8 +23,10 @@ async function computeHash(url, title) {
   return await computeSHA256(content);
 }
 
-// 同步核心逻辑
+// 同步核心逻辑（带5秒超时）
 async function doSimpleSync(peerUrl) {
+  const TIMEOUT_MS = 5000;
+
   // 从 storage 获取所有链接
   const db = await new Promise((resolve) => {
     const request = indexedDB.open('readingLinks', 3);
@@ -50,11 +52,27 @@ async function doSimpleSync(peerUrl) {
   );
 
   const apiUrl = `${peerUrl.replace(/\/$/, '')}/api/sync`;
-  const response = await fetch(apiUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ links: linksWithHash })
-  });
+
+  // 使用 AbortController 实现 5 秒超时
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+  let response;
+  try {
+    response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ links: linksWithHash }),
+      signal: controller.signal
+    });
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error('同步超时，请检查网络连接');
+    }
+    throw err;
+  }
+  clearTimeout(timeoutId);
 
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}`);
