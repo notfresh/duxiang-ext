@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(timeout 3 python3 simple-server.py 8080)",
+      "Bash(timeout 3 /c/projects/duxiang-pack/duxiang-ext/sync-design/demo-python/simple-server.py 8080)",
+      "Bash(python3 -c \"import sys; sys.path.insert\\(0, 'sync-design/demo-python'\\); import simple_server; simple_server.run_server\\(8080\\)\")",
+      "Bash(curl -s http://localhost:8080/)",
+      "Bash(pkill -f simple_server)"
+    ]
+  }
+}

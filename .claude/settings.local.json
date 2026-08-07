@@ -1,7 +1,19 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:minimax-algeng-chat-tts.oss-cn-wulanchabu.aliyuncs.com)"
+      "WebFetch(domain:minimax-algeng-chat-tts.oss-cn-wulanchabu.aliyuncs.com)",
+      "Bash(ls /c/Users/zhengxu/.claude/projects/c--projects-duxiang-pack-duxiang-ext/memory/ 2>/dev/null || echo \"no memory dir\")",
+      "Read(//c/Users/zhengxu/.claude/projects/c--projects-duxiang-pack-duxiang-ext/**)",
+      "Bash(git -C \"/c/projects/duxiang-pack/duxiang-ext\" log --oneline -5)",
+      "Bash(git -C \"/c/projects/duxiang-pack/duxiang-ext\" add \"docs/superpowers/specs/2026-06-12-group-detail-home-button-design.md\")",
+      "Bash(git -C /c/projects/duxiang-pack/duxiang-ext commit -m ' *)",
+      "Bash(git -C \"/c/projects/duxiang-pack/duxiang-ext\" add \"docs/superpowers/plans/2026-06-12-group-detail-home-button-implementation.md\")",
+      "Bash(git -C \"/c/projects/duxiang-pack/duxiang-ext\" add group.js)",
+      "Bash(git -C \"/c/projects/duxiang-pack/duxiang-ext\" add \"docs/superpowers/specs/2026-06-12-group-header-buttons-gap-design.md\")",
+      "Bash(git -C \"/c/projects/duxiang-pack/duxiang-ext\" add \"docs/superpowers/plans/2026-06-12-group-header-buttons-gap-implementation.md\")",
+      "Bash(git -C \"/c/projects/duxiang-pack/duxiang-ext\" add group.html)",
+      "Bash(git -C \"/c/projects/duxiang-pack/duxiang-ext\" log --oneline -8)",
+      "Bash(git -C \"/c/projects/duxiang-pack/duxiang-ext\" diff --stat HEAD~1 HEAD)"
     ]
   }
 }
