@@ -3,7 +3,11 @@ console.log('[background] ========== Service Worker 已启动 ==========');
 console.log('[background] 时间:', new Date().toISOString());
 console.log('[background] 扩展 ID:', chrome.runtime.id);
 
-// 静态导入 simple-sync 模块
+// 静态导入所有需要的模块
+import { loadSettings } from './js/settings.js';
+import { createSyncRuntime, getRuntime } from './js/sync/bootstrap.js';
+import { mountSyncRouter } from './js/sync/infra/sync-router.js';
+
 // ========== 轻量级同步模块（内联）==========
 // 使用 SHA-256 计算 hash
 async function computeSHA256(content) {
@@ -84,18 +88,17 @@ async function doSimpleSync(peerUrl) {
 
 // initialize sync runtime and mount router (non-blocking)
 try {
-    import('./js/sync/bootstrap.js').then(async (mod) => {
+    (async () => {
         try {
-            await mod.createSyncRuntime();
-            const router = await import('./js/sync/infra/sync-router.js');
-            router.mountSyncRouter();
+            await createSyncRuntime();
+            mountSyncRouter();
             console.log('[background] sync runtime initialized and router mounted');
         } catch (e) {
             console.warn('[background] failed to initialize sync runtime/router', e);
         }
-    });
+    })();
 } catch (e) {
-    console.warn('[background] dynamic import failed for sync bootstrap', e);
+    console.warn('[background] failed to initialize sync runtime/router', e);
 }
 
 // 弹窗尺寸常量
@@ -126,7 +129,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'sync.pull') {
     (async () => {
       try {
-        const { createSyncRuntime, getRuntime } = await import('./js/sync/bootstrap.js');
         await createSyncRuntime({ baseUrlForPeer: (p) => p });
         const runtime = getRuntime();
         if (!runtime || !runtime.client) {
@@ -147,7 +149,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'sync.push') {
     (async () => {
       try {
-        const { createSyncRuntime, getRuntime } = await import('./js/sync/bootstrap.js');
         await createSyncRuntime({ baseUrlForPeer: (p) => p });
         const runtime = getRuntime();
         if (!runtime || !runtime.client) {
@@ -168,7 +169,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'simple-sync') {
     (async () => {
       try {
-        const { loadSettings } = await import('./js/settings.js');
         const userSettings = await loadSettings();
         const peerUrl = userSettings.syncPeerUrl;
 
@@ -191,7 +191,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'simple-pull') {
     (async () => {
       try {
-        const { loadSettings } = await import('./js/settings.js');
         const userSettings = await loadSettings();
         const peerUrl = userSettings.syncPeerUrl;
 
