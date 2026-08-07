@@ -65,8 +65,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const settingsCancelBtn = document.getElementById('settingsCancelBtn');
   const settingsSaveBtn = document.getElementById('settingsSaveBtn');
   const syncPeerUrlInput = document.getElementById('syncPeerUrlInput');
-  const syncPullBtn = document.getElementById('syncPullBtn');
-  const syncPushBtn = document.getElementById('syncPushBtn');
+  const syncBtn = document.getElementById('syncBtn');
   const syncStatusText = document.getElementById('syncStatusText');
   const linkCountSpan = document.getElementById('linkCountSpan');
   const groupCountSpan = document.getElementById('groupCountSpan');
@@ -1738,29 +1737,9 @@ document.addEventListener('DOMContentLoaded', function() {
   settingsCancelBtn.addEventListener('click', hideSettingsDialog);
   settingsSaveBtn.addEventListener('click', saveSettingsAndApply);
 
-  // 同步拉取按钮
-  if (syncPullBtn) {
-    syncPullBtn.addEventListener('click', async () => {
-      if (syncStatusText) syncStatusText.textContent = '正在拉取...';
-      try {
-        const res = await chrome.runtime.sendMessage({ type: 'simple-pull' });
-        if (res && res.success) {
-          if (syncStatusText) syncStatusText.textContent = res.message || '拉取成功';
-          // 刷新链接列表
-          loadedLinks = await loadLinks(false);
-          renderLinksList(loadedLinks);
-        } else {
-          if (syncStatusText) syncStatusText.textContent = `拉取失败: ${res?.message || '未知错误'}`;
-        }
-      } catch (e) {
-        if (syncStatusText) syncStatusText.textContent = '拉取异常: ' + e.message;
-      }
-    });
-  }
-
-  // 同步推送按钮
-  if (syncPushBtn) {
-    syncPushBtn.addEventListener('click', async () => {
+  // 同步按钮
+  if (syncBtn) {
+    syncBtn.addEventListener('click', async () => {
       if (syncStatusText) syncStatusText.textContent = '正在同步...';
       try {
         const res = await chrome.runtime.sendMessage({ type: 'simple-sync' });
