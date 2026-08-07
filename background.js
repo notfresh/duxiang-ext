@@ -84,6 +84,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })();
     return true;
   }
+
+  // 轻量级双向同步
+  if (message.type === 'simple-sync') {
+    (async () => {
+      try {
+        const { simpleSync } = await import('./js/simple-sync.js');
+        const settings = await import('./js/settings.js');
+        const userSettings = await settings.loadSettings();
+        const peerUrl = userSettings.syncPeerUrl;
+
+        if (!peerUrl) {
+          sendResponse({ success: false, message: '请先配置服务器地址' });
+          return;
+        }
+
+        const result = await simpleSync(peerUrl);
+        sendResponse(result);
+      } catch (e) {
+        console.error('[background] simple-sync error', e);
+        sendResponse({ success: false, message: e.message });
+      }
+    })();
+    return true;
+  }
 });
 
 chrome.commands.onCommand.addListener((command) => {
