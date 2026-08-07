@@ -4,7 +4,83 @@ console.log('[background] 时间:', new Date().toISOString());
 console.log('[background] 扩展 ID:', chrome.runtime.id);
 
 // 静态导入 simple-sync 模块
-import { simpleSync, simplePull } from './js/simple-sync.js';
+// ========== 轻量级同步模块（内联）==========
+// 使用 SHA-256 计算 hash
+async function computeSHA256(content) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(content);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function computeHash(url, title) {
+  const content = (title || '') + '::' + (url || '');
+  return await computeSHA256(content);
+}
+
+// 同步核心逻辑
+async function doSimpleSync(peerUrl) {
+  // 从 storage 获取所有链接
+  const db = await new Promise((resolve) => {
+    const request = indexedDB.open('readingLinks', 3);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => { throw new Error('DB open failed'); };
+  });
+
+  const links = await new Promise((resolve, reject) => {
+    const tx = db.transaction('links', 'readonly');
+    const store = tx.objectStore('links');
+    const request = store.getAll();
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+
+  // 发送到服务器
+  const linksWithHash = await Promise.all(
+    links.map(async link => ({
+      title: link.title,
+      url: link.url,
+      hash: await computeHash(link.url, link.title)
+    }))
+  );
+
+  const apiUrl = `${peerUrl.replace(/\/$/, '')}/api/sync`;
+  const response = await fetch(apiUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ links: linksWithHash })
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+
+  const data = await response.json();
+  const serverLinks = data.links || [];
+
+  // 检查并创建本地不存在的链接
+  const localHashes = await Promise.all(links.map(l => computeHash(l.url, l.title)));
+  const localHashSet = new Set(localHashes);
+
+  let createdCount = 0;
+  for (const link of serverLinks) {
+    const hash = await computeHash(link.url, link.title);
+    if (!localHashSet.has(hash)) {
+      // 创建新链接
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction('links', 'readwrite');
+        const store = tx.objectStore('links');
+        store.add({ title: link.title, url: link.url, timestamp: new Date().toISOString() });
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+      createdCount++;
+    }
+  }
+
+  return { success: true, message: `同步成功，已创建 ${createdCount} 个新链接`, createdCount };
+}
 
 // initialize sync runtime and mount router (non-blocking)
 try {
@@ -101,7 +177,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           return;
         }
 
-        const result = await simpleSync(peerUrl);
+        const result = await doSimpleSync(peerUrl);
         sendResponse(result);
       } catch (e) {
         console.error('[background] simple-sync error', e);
