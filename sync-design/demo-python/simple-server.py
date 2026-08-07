@@ -35,7 +35,12 @@ class SyncHandler(BaseHTTPRequestHandler):
             # 读取请求体
             content_length = int(self.headers.get('Content-Length', 0))
             body = self.rfile.read(content_length)
-            data = json.loads(body.decode('utf-8'))
+            # 尝试 utf-8，失败则用 gbk（Windows 控制台）
+            try:
+                body_str = body.decode('utf-8')
+            except UnicodeDecodeError:
+                body_str = body.decode('gbk', errors='ignore')
+            data = json.loads(body_str)
 
             received_links = data.get('links', [])
 
@@ -110,14 +115,14 @@ def run_server(port=8080):
     """启动服务器"""
     server_address = ('', port)
     httpd = HTTPServer(server_address, SyncHandler)
-    print(f"🚀 同步服务器启动于 http://localhost:{port}")
-    print(f"   同步端点: POST http://localhost:{port}/api/sync")
-    print(f"   状态页面: GET http://localhost:{port}/status")
-    print(f"   按 Ctrl+C 停止服务器")
+    print(f"Simple Sync Server started at http://localhost:{port}")
+    print(f"  Sync endpoint: POST http://localhost:{port}/api/sync")
+    print(f"  Status page:   GET http://localhost:{port}/status")
+    print(f"Press Ctrl+C to stop")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
-        print("\n👋 服务器已停止")
+        print("\nServer stopped")
         httpd.server_close()
 
 
