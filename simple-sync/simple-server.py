@@ -42,9 +42,21 @@ class SyncHandler(BaseHTTPRequestHandler):
                 body_str = body.decode('gbk', errors='ignore')
             data = json.loads(body_str)
 
+            is_pull = data.get('pull', False)
             received_links = data.get('links', [])
 
-            # 找出服务器没有的链接
+            # 拉取模式：返回服务器上所有的链接
+            if is_pull:
+                all_links = list(links_db.values())
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = {'links': all_links}
+                self.wfile.write(json.dumps(response).encode('utf-8'))
+                print(f"[pull] 返回 {len(all_links)} 个链接")
+                return
+
+            # 同步模式：找出服务器没有的链接并保存
             missing_links = []
             for link in received_links:
                 link_hash = link.get('hash')

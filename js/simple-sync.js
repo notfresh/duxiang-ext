@@ -120,7 +120,7 @@ async function syncLinksToLocal(links) {
 }
 
 /**
- * 执行完整同步流程
+ * 执行完整同步流程（双向）
  * @param {string} peerUrl - 服务器地址
  * @returns {Promise<{success: boolean, message: string, createdCount?: number}>}
  */
@@ -142,6 +142,63 @@ export async function simpleSync(peerUrl) {
   return {
     success: true,
     message: `同步成功，已创建 ${createdCount} 个新链接`,
+    createdCount
+  };
+}
+
+/**
+ * 发起拉取请求（单向，只获取服务器上的链接）
+ * @param {string} peerUrl - 服务器地址
+ * @returns {Promise<{success: boolean, links?: Array, error?: string}>}
+ */
+async function pullFromServer(peerUrl) {
+  const apiUrl = `${peerUrl.replace(/\/$/, '')}/api/sync`;
+
+  try {
+    // 发送空数组，告诉服务器这是拉取请求
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ links: [], pull: true })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return { success: true, links: data.links || [] };
+  } catch (error) {
+    console.error('[simple-sync] 拉取请求失败:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * 执行拉取流程（单向）
+ * @param {string} peerUrl - 服务器地址
+ * @returns {Promise<{success: boolean, message: string, createdCount?: number}>}
+ */
+export async function simplePull(peerUrl) {
+  if (!peerUrl) {
+    return { success: false, message: '请先配置服务器地址' };
+  }
+
+  // 从服务器拉取链接
+  const result = await pullFromServer(peerUrl);
+
+  if (!result.success) {
+    return { success: false, message: `拉取失败: ${result.error}` };
+  }
+
+  // 同步返回的链接到本地
+  const createdCount = await syncLinksToLocal(result.links);
+
+  return {
+    success: true,
+    message: `拉取成功，已创建 ${createdCount} 个新链接`,
     createdCount
   };
 }

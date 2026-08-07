@@ -1741,22 +1741,16 @@ document.addEventListener('DOMContentLoaded', function() {
   // 同步拉取按钮
   if (syncPullBtn) {
     syncPullBtn.addEventListener('click', async () => {
-      const peerUrl = syncPeerUrlInput ? syncPeerUrlInput.value.trim() : '';
-      if (!peerUrl) {
-        if (syncStatusText) syncStatusText.textContent = '请先输入对端 URL';
-        return;
-      }
       if (syncStatusText) syncStatusText.textContent = '正在拉取...';
       try {
-        const res = await chrome.runtime.sendMessage({ type: 'sync.pull', peerId: peerUrl, entityType: 'LINK' });
+        const res = await chrome.runtime.sendMessage({ type: 'simple-pull' });
         if (res && res.success) {
-          const cursor = res.data?.latestCursor || '-';
-          if (syncStatusText) syncStatusText.textContent = `拉取成功，cursor: ${cursor}`;
+          if (syncStatusText) syncStatusText.textContent = res.message || '拉取成功';
           // 刷新链接列表
           loadedLinks = await loadLinks(false);
           renderLinksList(loadedLinks);
         } else {
-          if (syncStatusText) syncStatusText.textContent = `拉取失败: ${res?.reason || '未知错误'}`;
+          if (syncStatusText) syncStatusText.textContent = `拉取失败: ${res?.message || '未知错误'}`;
         }
       } catch (e) {
         if (syncStatusText) syncStatusText.textContent = '拉取异常: ' + e.message;
