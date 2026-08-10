@@ -1,15 +1,16 @@
-# 轻量级同步服务器设计
+# 轻量级同步服务器设计（Flask 版）
 
 ## 概述
 
-实现一个最简单的 Python 3 同步服务器，支持简单双向同步协议，无需外部依赖。
+将现有的 `http.server` 实现迁移到 Flask 框架，保持完全相同的功能和行为，同时享受 Flask 带来的简洁性和可扩展性。
 
 ## 功能需求
 
 - 接收客户端发送的链接数组（含 hash）
-- 存储收到的链接
+- 存储收到的链接到 JSON 文件
 - 返回服务器没有的链接（让客户端去创建）
 - 提供状态查看接口
+- 提供首页
 
 ## 技术设计
 
@@ -24,7 +25,8 @@
   "links": [
     { "title": "标题", "url": "https://...", "hash": "sha256值" },
     ...
-  ]
+  ],
+  "pull": false  // 可选，为 true 时表示拉取模式
 }
 ```
 
@@ -40,14 +42,13 @@
 
 ### 技术栈
 
-- Python 3 内置模块
-- `http.server` - 内置 HTTP 服务器
+- Flask - Web 框架
 - `hashlib` - SHA-256 计算
 - `json` - JSON 处理
 
 ### 存储
 
-内存字典存储：`{hash: {title, url, hash}}`
+内存字典存储：`{hash: {title, url, hash}}`，持久化到 `links.json`
 
 ### 接口
 
@@ -59,7 +60,10 @@
 
 ## 实现步骤
 
-1. 使用 `http.server.HTTPServer` 创建服务器
-2. 实现 `BaseHTTPRequestHandler` 处理请求
-3. 内存存储链接数据
-4. 支持状态查看
+1. 创建 Flask 应用
+2. 实现同步路由 `/api/sync`
+3. 实现状态路由 `/status`
+4. 实现首页路由 `/`
+5. 迁移数据层（load_links, save_links, compute_hash）
+6. 添加 CORS 支持
+7. 创建 requirements.txt

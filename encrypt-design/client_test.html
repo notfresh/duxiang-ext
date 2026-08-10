@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>JS 读取并解密 server_data.json</title>
+</head>
+<body>
+  <h1>JS 解密测试</h1>
+  <h2>1. 读取 server_data.json 并解密</h2>
+  <pre id="step1" style="background:#f5f5f5;padding:10px;"></pre>
+  <h2>2. 生成 client_data.json（加密数据）</h2>
+  <pre id="step2" style="background:#f5f5f5;padding:10px;"></pre>
+  <h2>3. 下载 client_data.json</h2>
+  <button onclick="download()">下载 client_data.json</button>
+
+  <script>
+    const PASSWORD = "DuXiangIsGreat";
+
+    // 用 SHA-256 派生密钥
+    async function deriveKey(password) {
+      const enc = new TextEncoder();
+      const keyData = await crypto.subtle.digest('SHA-256', enc.encode(password));
+      return crypto.subtle.importKey(
+        "raw",
+        keyData,
+        { name: "AES-CBC", length: 256 },
+        false,
+        ["encrypt", "decrypt"]
+      );
+    }
+
+    function pkcs7Unpad(data) {
+      const padLen = data[data.length - 1];
+      return data.slice(0, data.length - padLen);
+    }
+
+    async function decrypt(encrypted, password) {
+      const key = await deriveKey(password);
+      const iv = Uint8Array.from(atob(encrypted.iv), c => c.charCodeAt(0));
+      const ciphertext = Uint8Array.from(atob(encrypted.data), c => c.charCodeAt(0));
+
+      const decrypted = await crypto.subtle.decrypt(
+        { name: "AES-CBC", iv: iv },
+        key,
+        ciphertext
+      );
+
+      const unpadded = pkcs7Unpad(new Uint8Array(decrypted));
+      return new TextDecoder().decode(unpadded);
+    }
+
+    async function encrypt(plaintext, password) {
+      const key = await deriveKey(password);
+      const iv = crypto.getRandomValues(new Uint8Array(16));
+      const enc = new TextEncoder();
+
+      // PKCS7 填充
+      const data = enc.encode(plaintext);
+      const padLen = 16 - (data.length % 16);
+      const padded = new Uint8Array(data.length + padLen);
+      padded.set(data);
+      padded.set(new Uint8Array(padLen).fill(padLen), data.length);
+
+      const ciphertext = await crypto.subtle.encrypt(
+        { name: "AES-CBC", iv: iv },
+        key,
+        padded
+      );
+
+      return {
+        iv: btoa(String.fromCharCode(...iv)),
+        data: btoa(String.fromCharCode(...new Uint8Array(ciphertext)))
+      };
+    }
+
+    // 读取 server_data.json（模拟，实际需要通过 fetch）
+    async function run() {
+      // 由于跨域限制，这里直接定义数据
+      const serverData = {
+        "data": [
+          {"title": "Google", "url": "https://google.com"},
+          {"title": "GitHub", "url": "https://github.com"},
+          {"title": "百度", "url": "https://baidu.com"}
+        ],
+        "encrypted": [
+          {
+            "title": {"iv": "", "data": ""},
+            "url": {"iv": "", "data": ""}
+          }
+        ]
+      };
+
+      // 从 server_data.json 读取加密数据（这里手动填入 Python 生成的加密结果）
+      // 实际使用时用 fetch('server_data.json')
+      document.getElementById('step1').textContent = '请先运行 Python 生成 server_data.json，然后手动填入加密数据';
+
+      // 解密测试
+      const testEncrypted = {
+        iv: "test",  // 这里填入实际 IV
+        data: "test" // 这里填入实际密文
+      };
+
+      // 完整流程示例：
+      // 1. 读取 server_data.json
+      // 2. 解密每条 encrypted 数据
+      // 3. 对比 decrypted 和 data 是否一致
+      // 4. 生成 client_data.json 包含新的加密数据
+    }
+
+    // 实际可用的解密函数
+    async function decryptFromPython(encrypted) {
+      return await decrypt(encrypted, PASSWORD);
+    }
+
+    // 生成客户端加密数据
+    async function generateClientData() {
+      const clientData = [
+        {"title": "淘宝", "url": "https://taobao.com"},
+        {"title": "京东", "url": "https://jd.com"}
+      ];
+
+      const encryptedData = [];
+      for (const item of clientData) {
+        encryptedData.push({
+          title: await encrypt(item.title, PASSWORD),
+          url: await encrypt(item.url, PASSWORD)
+        });
+      }
+
+      const output = {
+        data: clientData,
+        encrypted: encryptedData
+      };
+
+      document.getElementById('step2').textContent = JSON.stringify(output, null, 2);
+      return output;
+    }
+
+    function download() {
+      const content = document.getElementById('step2').textContent;
+      const blob = new Blob([content], {type: 'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'client_data.json';
+      a.click();
+    }
+
+    // 运行
+    generateClientData();
+  </script>
+</body>
+</html>

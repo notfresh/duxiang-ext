@@ -1,0 +1,48 @@
+{
+  "data": [
+    {
+      "title": "Google",
+      "url": "https://google.com"
+    },
+    {
+      "title": "GitHub",
+      "url": "https://github.com"
+    },
+    {
+      "title": "百度",
+      "url": "https://baidu.com"
+    }
+  ],
+  "encrypted": [
+    {
+      "title": {
+        "iv": "PuqX/+BrPr2xhbrsUuoS4g==",
+        "data": "2sHpTt45ac2DxZa/KtMC9w=="
+      },
+      "url": {
+        "iv": "II8rtmgGXXCK6WJnnHXUTQ==",
+        "data": "MbAUvszZiFD33dzo8ZqquifDHRAws2gF/lfV7dQVxCg="
+      }
+    },
+    {
+      "title": {
+        "iv": "Y3RFOxQs9vwAVGZbsnofHw==",
+        "data": "Ofi17HTKcIhWezw+kGzogA=="
+      },
+      "url": {
+        "iv": "AOPN+VnQzkrzkdFfetKSnA==",
+        "data": "GBdxsv8CTXGrdg5+mO1TeAdIrAfyFQkGXuIQbqsE2SA="
+      }
+    },
+    {
+      "title": {
+        "iv": "W2nc9kfOUCkRg94u9mdXjw==",
+        "data": "wYgu049KxE9ZS2qWA7gzTg=="
+      },
+      "url": {
+        "iv": "VQcBgmsDW9tRUUkIlFPMZw==",
+        "data": "aHh5PGE3lpbeFXnRgStJukJ81l6Oewo1iTA2937A6xc="
+      }
+    }
+  ]
+}

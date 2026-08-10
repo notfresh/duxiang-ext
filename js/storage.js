@@ -624,12 +624,21 @@ export async function loadArchivedLinks() {
 
     // 只返回已归档的链接
     const archivedLinks = [];
+    let checkedCount = 0;
+    let foundArchivedCount = 0;
+
     for (const link of links) {
+      checkedCount++;
       if (!link || typeof link !== 'object' || !link.url) {
         continue;
       }
-      console.log('[loadArchivedLinks] 检查链接:', link.id, 'archived:', link.archived, '类型:', typeof link.archived);
-      if (link.archived === true) {  // 使用严格等于检查
+      // 严格检查 archived === true（排除 undefined、false、null 等）
+      const isArchived = link.archived === true;
+      if (isArchived) {
+        foundArchivedCount++;
+        console.log('[loadArchivedLinks] ✅ 找到归档链接:', link.id, link.title, 'archived:', link.archived);
+      }
+      if (isArchived) {  // 使用严格等于检查
         archivedLinks.push({
           id: link.id,
           title: (link.title || '').trim(),
@@ -650,7 +659,7 @@ export async function loadArchivedLinks() {
       return timeB - timeA;
     });
 
-    console.log('[loadArchivedLinks] 加载完成，返回', archivedLinks.length, '条已归档链接');
+    console.log('[loadArchivedLinks] 检查了', checkedCount, '条链接，找到', foundArchivedCount, '条归档链接，最终返回', archivedLinks.length, '条');
     return archivedLinks;
   } catch (error) {
     console.error('[loadArchivedLinks] 加载已归档链接失败:', error);

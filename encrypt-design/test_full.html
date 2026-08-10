@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>完整测试：Python加密 → JS解密</title>
+</head>
+<body>
+  <h1>跨语言加密解密完整测试</h1>
+  <pre id="output" style="background:#f0f0f0;padding:15px;white-space:pre-wrap;"></pre>
+
+  <script>
+    const PASSWORD = "DuXiangIsGreat";
+
+    function log(msg) {
+      document.getElementById('output').textContent += msg + '\n';
+      console.log(msg);
+    }
+
+    // SHA-256 派生密钥
+    async function deriveKey(password) {
+      const enc = new TextEncoder();
+      const keyData = await crypto.subtle.digest('SHA-256', enc.encode(password));
+      return crypto.subtle.importKey(
+        "raw",
+        keyData,
+        { name: "AES-CBC", length: 256 },
+        false,
+        ["encrypt", "decrypt"]
+      );
+    }
+
+    // Base64 编解码
+    function base64Encode(buffer) {
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return btoa(binary);
+    }
+
+    function base64Decode(base64) {
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return bytes;
+    }
+
+    async function encrypt(plaintext, password) {
+      const key = await deriveKey(password);
+      const iv = crypto.getRandomValues(new Uint8Array(16));
+      const enc = new TextEncoder();
+
+      // PKCS7 填充
+      const data = enc.encode(plaintext);
+      const padLen = 16 - (data.length % 16);
+      const padded = new Uint8Array(data.length + padLen);
+      padded.set(data);
+      padded.set(new Uint8Array(padLen).fill(padLen), data.length);
+
+      const ciphertext = await crypto.subtle.encrypt(
+        { name: "AES-CBC", iv: iv },
+        key,
+        padded
+      );
+
+      return {
+        iv: base64Encode(iv),
+        data: base64Encode(ciphertext)
+      };
+    }
+
+    async function decrypt(encrypted, password) {
+      const key = await deriveKey(password);
+      const iv = base64Decode(encrypted.iv);
+      const ciphertext = base64Decode(encrypted.data);
+
+      const decrypted = await crypto.subtle.decrypt(
+        { name: "AES-CBC", iv: iv },
+        key,
+        ciphertext
+      );
+
+      // PKCS7 去填充
+      const arr = new Uint8Array(decrypted);
+      const padLen = arr[arr.length - 1];
+      const unpadded = arr.slice(0, arr.length - padLen);
+
+      return new TextDecoder().decode(unpadded);
+    }
+
+    // Python 生成的加密数据
+    const PYTHON_ENCRYPTED = [
+      {
+        "title": { "iv": "kcjxCYrtVJiLz6H7JpZUUA==", "data": "AzpNUm/dqWN61OLKSmoVng==" },
+        "url": { "iv": "zB0ASXqY6Z8fYhVhekLWpg==", "data": "e6ofJfqc57WxHvG67bOlA/pl9iA4wX1Mq8z1DgIBQP4=" }
+      },
+      {
+        "title": { "iv": "mVl60hLk3dsb0CCy7BLqBw==", "data": "rA7l/gF33BVrmti9YjYzVg==" },
+        "url": { "iv": "zmI6B1u/5kPCt3R3510xIw==", "data": "dVa7XUCkdVxrxdfYC3q/gOcwpd+nuMh3Ee6TZbMJCRw=" }
+      },
+      {
+        "title": { "iv": "ZIJ5MdONzEmfca2PsljNWw==", "data": "PlHyvyeChfpiNtTMoX3/EA==" },
+        "url": { "iv": "co2n0VjTobHD2OXZ8ViaXA==", "data": "Et4GPjATNv5Fgv5QElU9lIWQU6vDOdkSJ67FF743ffA=" }
+      }
+    ];
+
+    // 期望的原始数据
+    const EXPECTED_DATA = [
+      {"title": "Google", "url": "https://google.com"},
+      {"title": "GitHub", "url": "https://github.com"},
+      {"title": "百度", "url": "https://baidu.com"}
+    ];
+
+    async function test() {
+      // ===== 测试 JS 自己的加解密 =====
+      log('=== JS 自己的加解密测试 ===\n');
+      const testStr = "Hello World";
+      const enc = await encrypt(testStr, PASSWORD);
+      const dec = await decrypt(enc, PASSWORD);
+      log(`加密: ${JSON.stringify(enc)}`);
+      log(`解密: ${dec}`);
+      log(`验证: ${dec === testStr ? '✓ 成功' : '✗ 失败'}`);
+
+      // ===== JS 解密 Python 加密的数据 =====
+      log('\n=== JS 解密 Python 加密的数据 ===\n');
+
+      const decrypted = [];
+      for (const item of PYTHON_ENCRYPTED) {
+        const title = await decrypt(item.title, PASSWORD);
+        const url = await decrypt(item.url, PASSWORD);
+        decrypted.push({ title, url });
+        log(`解密: "${title}" -> "${url}"`);
+      }
+
+      const match = JSON.stringify(decrypted) === JSON.stringify(EXPECTED_DATA);
+      log(`\n验证结果: ${match ? '✓ 成功！Python 和 JS 加解密互通' : '✗ 失败'}`);
+    }
+
+    test();
+  </script>
+</body>
+</html>

@@ -6,6 +6,7 @@ import { importBookmarks } from './js/bookmarks.js';
 import { setupSearch } from './js/search.js';
 import { loadSettings, saveSettings, updateCompactModeSettings, generateUUIDv4 } from './js/settings.js';
 import { loadHistory, addSearchKeyword, togglePinKeyword, deleteKeyword, getMaxCount, setMaxCount } from './js/searchHistory.js';
+import { simpleSync } from './js/simple-sync.js';
 
 document.addEventListener('DOMContentLoaded', function() {
   // 获取DOM元素
@@ -65,6 +66,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const settingsCancelBtn = document.getElementById('settingsCancelBtn');
   const settingsSaveBtn = document.getElementById('settingsSaveBtn');
   const syncPeerUrlInput = document.getElementById('syncPeerUrlInput');
+  const syncSecretInput = document.getElementById('syncSecretInput');
   const syncBtn = document.getElementById('syncBtn');
   const syncStatusText = document.getElementById('syncStatusText');
   const linkCountSpan = document.getElementById('linkCountSpan');
@@ -1520,6 +1522,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (syncPeerUrlInput) {
       syncPeerUrlInput.value = currentSettings.syncPeerUrl || '';
     }
+    if (syncSecretInput) {
+      syncSecretInput.value = currentSettings.syncSecret || '';
+    }
     if (syncStatusText) {
       syncStatusText.textContent = '';
     }
@@ -1622,12 +1627,14 @@ document.addEventListener('DOMContentLoaded', function() {
       }
       
       // 更新设置（立即更新 UI，后台异步持久化以减少延迟）
-      // 获取同步 peer URL
+      // 获取同步 peer URL 和密钥
       const syncPeerUrl = syncPeerUrlInput ? (syncPeerUrlInput.value || '').trim() : '';
+      const syncSecret = syncSecretInput ? (syncSecretInput.value || '').trim() : '';
 
       const updatedSettings = {
         ...currentSettings,
         syncPeerUrl: syncPeerUrl,
+        syncSecret: syncSecret,
         compactMode: {
           ...((currentSettings && currentSettings.compactMode) || {}),
           enabled: compactModeEnabled,
@@ -1738,20 +1745,40 @@ document.addEventListener('DOMContentLoaded', function() {
   settingsSaveBtn.addEventListener('click', saveSettingsAndApply);
 
   // 同步按钮
+  console.log('[popup] 🔵 syncBtn 元素:', syncBtn);
   if (syncBtn) {
+    console.log('[popup] 🔵 绑定同步按钮事件');
     syncBtn.addEventListener('click', async () => {
+      console.log('[popup] 🔵 点击了同步按钮');
       if (syncStatusText) syncStatusText.textContent = '正在同步...';
       try {
-        const res = await chrome.runtime.sendMessage({ type: 'simple-sync' });
+        // 获取服务器地址和密钥
+        const userSettings = await loadSettings();
+        const peerUrl = userSettings.syncPeerUrl;
+        const secret = userSettings.syncSecret || '';
+        console.log('[popup] 🔵 peerUrl:', peerUrl);
+        console.log('[popup] 🔵 secret:', secret ? '已配置' : '未配置');
+
+        if (!peerUrl) {
+          if (syncStatusText) syncStatusText.textContent = '请先配置服务器地址';
+          return;
+        }
+
+        // 调用同步（传入密钥）
+        const res = await simpleSync(peerUrl, secret);
+        console.log('[popup] 🔵 同步结果:', res);
         if (res && res.success) {
           if (syncStatusText) syncStatusText.textContent = res.message || '同步成功';
         } else {
           if (syncStatusText) syncStatusText.textContent = `同步失败: ${res?.message || '未知错误'}`;
         }
       } catch (e) {
+        console.error('[popup] ❌ 同步异常:', e);
         if (syncStatusText) syncStatusText.textContent = '同步异常: ' + e.message;
       }
     });
+  } else {
+    console.error('[popup] ❌ syncBtn 按钮未找到！');
   }
 
   // 点击遮罩层关闭设置对话框

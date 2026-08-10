@@ -5,7 +5,23 @@
       "Bash(timeout 3 /c/projects/duxiang-pack/duxiang-ext/sync-design/demo-python/simple-server.py 8080)",
       "Bash(python3 -c \"import sys; sys.path.insert\\(0, 'sync-design/demo-python'\\); import simple_server; simple_server.run_server\\(8080\\)\")",
       "Bash(curl -s http://localhost:8080/)",
-      "Bash(pkill -f simple_server)"
+      "Bash(pkill -f simple_server)",
+      "WebFetch(domain:localhost)",
+      "Bash(curl -s http://localhost:8080/status)",
+      "Bash(python -c \"import urllib.request; print\\(urllib.request.urlopen\\('http://127.0.0.1:8080/status'\\).read\\(\\).decode\\(\\)\\)\")",
+      "Bash(python -c \"import socket; s = socket.socket\\(\\); s.settimeout\\(2\\); s.connect\\(\\('127.0.0.1', 8080\\)\\); s.send\\(b'GET /status HTTP/1.1\\\\r\\\\nHost: localhost\\\\r\\\\n\\\\r\\\\n'\\); print\\(s.recv\\(1024\\).decode\\(\\)\\); s.close\\(\\)\")",
+      "Bash(netstat -ano)",
+      "Bash(taskkill //F //PID 36128)",
+      "Bash(python simple-sync/simple-server.py 8080)",
+      "Bash(curl -s -X POST http://localhost:8080/api/sync -H \"Content-Type: application/json\" -d '{\"links\":[{\"title\":\"test\",\"url\":\"http://test.com\",\"hash\":\"abc123\"}]}')",
+      "Bash(curl -v http://localhost:8080/)",
+      "Bash(curl -s -X POST http://localhost:8080/api/sync -H \"Content-Type: application/json\" -d '{\"links\":[{\"title\":\"test\",\"url\":\"http://example.com\",\"hash\":\"abc123\"}]}')",
+      "Bash(curl -s -X POST http://localhost:8080/api/sync -H \"Content-Type: application/json\" -d '{\"links\":[{\"title\":\"测试链接\",\"url\":\"https://baidu.com\",\"hash\":\"test999\"}]}')",
+      "Bash(python simple-sync/simple-server.py)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" --connect-timeout 5 http://localhost:8080)",
+      "Bash(python simple-server.py)",
+      "Bash(python -c \"from simple_sync.simple_server import run_server; run_server\\(8080\\)\")",
+      "Bash(curl -v http://localhost:8080/status)"
     ]
   }
 }
