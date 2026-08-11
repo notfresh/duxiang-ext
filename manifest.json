@@ -18,8 +18,7 @@
         "http://127.0.0.1:*/*"
     ],
     "background": {
-      "service_worker": "background.js",
-      "type": "module"
+      "service_worker": "background.js"
     },
     "action": {
       "default_popup": "popup.html",

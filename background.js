@@ -3,28 +3,6 @@ console.log('[background] ========== Service Worker 已启动 ==========');
 console.log('[background] 时间:', new Date().toISOString());
 console.log('[background] 扩展 ID:', chrome.runtime.id);
 
-// 静态导入所有需要的模块
-import { loadSettings } from './js/settings.js';
-import { createSyncRuntime, getRuntime } from './js/sync/bootstrap.js';
-import { mountSyncRouter } from './js/sync/infra/sync-router.js';
-
-console.log('[background] ✅ 模块导入完成');
-
-// initialize sync runtime and mount router (non-blocking)
-try {
-    (async () => {
-        try {
-            await createSyncRuntime();
-            mountSyncRouter();
-            console.log('[background] sync runtime initialized and router mounted');
-        } catch (e) {
-            console.warn('[background] failed to initialize sync runtime/router', e);
-        }
-    })();
-} catch (e) {
-    console.warn('[background] failed to initialize sync runtime/router', e);
-}
-
 // 弹窗尺寸常量
 const POPUP_WIDTH = 400;
 const POPUP_HEIGHT = 600;
@@ -49,47 +27,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // 保持消息通道开放以支持异步响应
   }
 
-  // 同步拉取
-  if (message.type === 'sync.pull') {
-    (async () => {
-      try {
-        await createSyncRuntime({ baseUrlForPeer: (p) => p });
-        const runtime = getRuntime();
-        if (!runtime || !runtime.client) {
-          sendResponse({ success: false, reason: 'sync runtime not ready' });
-          return;
-        }
-        const res = await runtime.client.pull(message.peerId, message.entityType);
-        sendResponse(res);
-      } catch (e) {
-        console.error('[background] sync.pull error', e);
-        sendResponse({ success: false, reason: e.message });
-      }
-    })();
-    return true;
-  }
-
-  // 同步推送
-  if (message.type === 'sync.push') {
-    (async () => {
-      try {
-        await createSyncRuntime({ baseUrlForPeer: (p) => p });
-        const runtime = getRuntime();
-        if (!runtime || !runtime.client) {
-          sendResponse({ success: false, reason: 'sync runtime not ready' });
-          return;
-        }
-        const res = await runtime.client.push(message.peerId, message.entityType);
-        sendResponse(res);
-      } catch (e) {
-        console.error('[background] sync.push error', e);
-        sendResponse({ success: false, reason: e.message });
-      }
-    })();
-    return true;
-  }
-
-});
+  });
 
 chrome.commands.onCommand.addListener((command) => {
     console.log('[background] 收到命令:', command);
@@ -369,15 +307,6 @@ async function saveSelectionToDB(url, title, text, html = '', contextTag = '') {
             };
 
             getRequest.onerror = () => reject(getRequest.error);
-        };
-
-        request.onupgradeneeded = (event) => {
-            const db = event.target.result;
-            // 创建 selections store
-            if (!db.objectStoreNames.contains(SELECTIONS_STORE_NAME)) {
-                console.log('[background] 创建 selections 对象存储');
-                db.createObjectStore(SELECTIONS_STORE_NAME, { keyPath: 'url' });
-            }
         };
     });
 }
