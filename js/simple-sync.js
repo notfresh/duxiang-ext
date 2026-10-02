@@ -3,10 +3,7 @@
  * 上传本地所有链接到服务器，获取服务器没有的链接并创建到本地
  */
 
-import { loadLinks, addLink } from './storage.js';
-
-// 预设的认证 token
-const AUTH_TOKEN = 'DUXIANG';
+import { loadLinks, addLink, getDeletedHashes, removeDeletedHashes, deleteLinkByHash } from './storage.js';
 
 /**
  * 使用 SHA-256 计算 hash（浏览器内置 Web Crypto API，无需外部依赖）
@@ -19,126 +16,6 @@ async function computeSHA256(content) {
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-// ===== 加密相关功能 =====
-
-/**
- * 从密码派生 AES-256 密钥
- * @param {string} password
- * @returns {Promise<CryptoKey>}
- */
-async function deriveKey(password) {
-  const encoder = new TextEncoder();
-  const keyData = await crypto.subtle.digest('SHA-256', encoder.encode(password));
-  return crypto.subtle.importKey(
-    'raw',
-    keyData,
-    { name: 'AES-CBC', length: 256 },
-    false,
-    ['encrypt', 'decrypt']
-  );
-}
-
-/**
- * AES-256-CBC 加密
- * @param {string} plaintext
- * @param {string} password
- * @returns {Promise<{iv: string, data: string}>}
- */
-async function encrypt(plaintext, password) {
-  const key = await deriveKey(password);
-  const iv = crypto.getRandomValues(new Uint8Array(16));
-  const encoder = new TextEncoder();
-
-  // PKCS7 填充
-  const data = encoder.encode(plaintext);
-  const padLen = 16 - (data.length % 16);
-  // 当数据刚好是16的倍数时，需要填充16个字节
-  const actualPadLen = padLen === 0 ? 16 : padLen;
-  const padded = new Uint8Array(data.length + actualPadLen);
-  padded.set(data);
-  // 填充 padLen 字节（值为 padLen 本身）
-  for (let i = 0; i < actualPadLen; i++) {
-    padded[data.length + i] = actualPadLen;
-  }
-
-  const ciphertext = await crypto.subtle.encrypt(
-    { name: 'AES-CBC', iv: iv },
-    key,
-    padded
-  );
-
-  // 转 Base64（使用 reduce 避免大数组时的栈溢出）
-  const ivArray = new Uint8Array(iv);
-  const cipherArray = new Uint8Array(ciphertext);
-  return {
-    iv: btoa(ivArray.reduce((acc, byte) => acc + String.fromCharCode(byte), '')),
-    data: btoa(cipherArray.reduce((acc, byte) => acc + String.fromCharCode(byte), ''))
-  };
-}
-
-/**
- * AES-256-CBC 解密
- * @param {{iv: string, data: string}} encrypted
- * @param {string} password
- * @returns {Promise<string>}
- */
-async function decrypt(encrypted, password) {
-  const key = await deriveKey(password);
-
-  // Base64 解码
-  const iv = Uint8Array.from(atob(encrypted.iv), c => c.charCodeAt(0));
-  const ciphertext = Uint8Array.from(atob(encrypted.data), c => c.charCodeAt(0));
-
-  const decrypted = await crypto.subtle.decrypt(
-    { name: 'AES-CBC', iv: iv },
-    key,
-    ciphertext
-  );
-
-  // PKCS7 去填充
-  const arr = new Uint8Array(decrypted);
-  const padLen = arr[arr.length - 1];
-  if (padLen < 1 || padLen > 16) {
-    throw new Error(`Invalid PKCS7 padding length: ${padLen}`);
-  }
-  for (let i = arr.length - padLen; i < arr.length; i++) {
-    if (arr[i] !== padLen) {
-      throw new Error('Invalid PKCS7 padding bytes');
-    }
-  }
-  const unpadded = arr.slice(0, arr.length - padLen);
-
-  return new TextDecoder().decode(unpadded);
-}
-
-/**
- * 判断是否需要加密
- * 本地/局域网不加密，公网需要加密
- * @param {string} url
- * @returns {boolean}
- */
-function shouldEncrypt(url) {
-  return false; // TODO 统一先不加密
-  // try {
-  //   const host = new URL(url).hostname;
-  //   return !(host === 'localhost' ||
-  //            host === '127.0.0.1' ||
-  //            host.startsWith('192.168.'));
-  // } catch (e) {
-  //   return true; // 默认加密
-  // }
-}
-
-/**
- * 加密 Authorization 头用的 token
- * @param {string} password
- * @returns {Promise<{iv: string, data: string}>}
- */
-async function encryptAuthToken(password) {
-  // encrypt() 内部会做 PKCS7 填充
-  return encrypt(AUTH_TOKEN, password);
 }
 
 /**
@@ -170,10 +47,9 @@ async function getLocalLinks() {
 /**
  * 发起同步请求
  * @param {string} peerUrl - 服务器地址
- * @param {string} secret - 同步密钥
  * @returns {Promise<{success: boolean, links?: Array, error?: string}>}
  */
-async function syncWithServer(peerUrl, secret = '') {
+async function syncWithServer(peerUrl) {
   // 获取本地所有链接
   const localLinks = await getLocalLinks();
 
@@ -186,40 +62,32 @@ async function syncWithServer(peerUrl, secret = '') {
     }))
   );
 
+  // 获取本地删除记录
+  const deletedHashes = await getDeletedHashes();
+  console.log('[simple-sync] 本地删除记录:', deletedHashes.length, '条');
+
   const apiUrl = `${peerUrl.replace(/\/$/, '')}/api/sync`;
-  const useEncryption = secret && shouldEncrypt(peerUrl);
 
   console.log('[simple-sync] 开始同步，请求URL:', apiUrl);
   console.log('[simple-sync] 链接数量:', linksWithHash.length);
-  console.log('[simple-sync] 使用加密:', useEncryption);
 
   // 15秒超时（大数据量需要更长时间）
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-  const headers = {
-    'Content-Type': 'application/json'
+  const requestData = {
+    links: linksWithHash,
+    deleted_hashes: deletedHashes
   };
 
-  let body;
-
-  if (useEncryption) {
-    // 加密请求体
-    const encryptedAuth = await encryptAuthToken(secret);
-    headers['Authorization'] = `Bearer ${JSON.stringify(encryptedAuth)}`;
-
-    const requestData = JSON.stringify({ links: linksWithHash });
-    const encryptedBody = await encrypt(requestData, secret);
-    body = JSON.stringify({ encrypted: encryptedBody });
-    console.log('[simple-sync] 请求已加密');
-  } else {
-    body = JSON.stringify({ links: linksWithHash });
-  }
+  const body = JSON.stringify(requestData);
 
   try {
     const response = await fetch(apiUrl, {
       method: 'POST',
-      headers,
+      headers: {
+        'Content-Type': 'application/json'
+      },
       body,
       signal: controller.signal
     });
@@ -232,19 +100,23 @@ async function syncWithServer(peerUrl, secret = '') {
 
     const data = await response.json();
 
-    let links = [];
-
-    if (data.encrypted) {
-      // 解密响应
-      const decrypted = await decrypt(data.encrypted, secret);
-      const parsed = JSON.parse(decrypted);
-      links = parsed.links || [];
-      console.log('[simple-sync] 响应已解密');
-    } else {
-      links = data.links || [];
-    }
+    const links = data.links || [];
+    const serverDeletedHashes = data.deleted_hashes || [];
 
     console.log('[simple-sync] 收到服务器返回的链接数量:', links.length);
+    console.log('[simple-sync] 服务器删除记录:', serverDeletedHashes.length, '条');
+
+    // 处理服务器的删除记录
+    for (const hash of serverDeletedHashes) {
+      await deleteLinkByHash(hash);
+    }
+
+    // 清除本地已同步的删除记录
+    if (deletedHashes.length > 0) {
+      await removeDeletedHashes(deletedHashes);
+      console.log('[simple-sync] 已清除本地删除记录');
+    }
+
     console.log('[simple-sync] 服务器返回的链接:', links);
     return { success: true, links };
   } catch (error) {
@@ -308,19 +180,13 @@ async function syncLinksToLocal(links) {
  * @param {string} peerUrl - 服务器地址
  * @returns {Promise<{success: boolean, message: string, createdCount?: number}>}
  */
-/**
- * 执行完整同步流程（双向）
- * @param {string} peerUrl - 服务器地址
- * @param {string} secret - 同步密钥
- * @returns {Promise<{success: boolean, message: string, createdCount?: number}>}
- */
-export async function simpleSync(peerUrl, secret = '') {
+export async function simpleSync(peerUrl) {
   if (!peerUrl) {
     return { success: false, message: '请先配置服务器地址' };
   }
 
   // 发起同步请求
-  const result = await syncWithServer(peerUrl, secret);
+  const result = await syncWithServer(peerUrl);
 
   if (!result.success) {
     return { success: false, message: `同步失败: ${result.error}` };
@@ -341,43 +207,27 @@ export async function simpleSync(peerUrl, secret = '') {
  * @param {string} peerUrl - 服务器地址
  * @returns {Promise<{success: boolean, links?: Array, error?: string}>}
  */
-/**
- * 发起拉取请求（单向，只获取服务器上的链接）
- * @param {string} peerUrl - 服务器地址
- * @param {string} secret - 同步密钥
- * @returns {Promise<{success: boolean, links?: Array, error?: string}>}
- */
-async function pullFromServer(peerUrl, secret = '') {
+async function pullFromServer(peerUrl) {
   const apiUrl = `${peerUrl.replace(/\/$/, '')}/api/sync`;
-  const useEncryption = secret && shouldEncrypt(peerUrl);
+
+  // 获取本地删除记录
+  const deletedHashes = await getDeletedHashes();
 
   console.log('[simple-sync] 开始拉取，请求URL:', apiUrl);
-  console.log('[simple-sync] 使用加密:', useEncryption);
 
-  const headers = {
-    'Content-Type': 'application/json'
+  const requestData = {
+    links: [],
+    pull: true,
+    deleted_hashes: deletedHashes
   };
-
-  let body;
-
-  if (useEncryption) {
-    // 加密请求体
-    const encryptedAuth = await encryptAuthToken(secret);
-    headers['Authorization'] = `Bearer ${JSON.stringify(encryptedAuth)}`;
-
-    const requestData = JSON.stringify({ links: [], pull: true });
-    const encryptedBody = await encrypt(requestData, secret);
-    body = JSON.stringify({ encrypted: encryptedBody });
-    console.log('[simple-sync] 请求已加密');
-  } else {
-    body = JSON.stringify({ links: [], pull: true });
-  }
 
   try {
     const response = await fetch(apiUrl, {
       method: 'POST',
-      headers,
-      body
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestData)
     });
 
     if (!response.ok) {
@@ -386,19 +236,22 @@ async function pullFromServer(peerUrl, secret = '') {
 
     const data = await response.json();
 
-    let links = [];
-
-    if (data.encrypted) {
-      // 解密响应
-      const decrypted = await decrypt(data.encrypted, secret);
-      const parsed = JSON.parse(decrypted);
-      links = parsed.links || [];
-      console.log('[simple-sync] 响应已解密');
-    } else {
-      links = data.links || [];
-    }
+    const links = data.links || [];
+    const serverDeletedHashes = data.deleted_hashes || [];
 
     console.log('[simple-sync] 收到服务器返回的链接数量:', links.length);
+    console.log('[simple-sync] 服务器删除记录:', serverDeletedHashes.length, '条');
+
+    // 处理服务器的删除记录
+    for (const hash of serverDeletedHashes) {
+      await deleteLinkByHash(hash);
+    }
+
+    // 清除本地已同步的删除记录
+    if (deletedHashes.length > 0) {
+      await removeDeletedHashes(deletedHashes);
+    }
+
     console.log('[simple-sync] 服务器返回的链接:', links);
     return { success: true, links };
   } catch (error) {
@@ -412,19 +265,13 @@ async function pullFromServer(peerUrl, secret = '') {
  * @param {string} peerUrl - 服务器地址
  * @returns {Promise<{success: boolean, message: string, createdCount?: number}>}
  */
-/**
- * 执行拉取流程（单向）
- * @param {string} peerUrl - 服务器地址
- * @param {string} secret - 同步密钥
- * @returns {Promise<{success: boolean, message: string, createdCount?: number}>}
- */
-export async function simplePull(peerUrl, secret = '') {
+export async function simplePull(peerUrl) {
   if (!peerUrl) {
     return { success: false, message: '请先配置服务器地址' };
   }
 
   // 从服务器拉取链接
-  const result = await pullFromServer(peerUrl, secret);
+  const result = await pullFromServer(peerUrl);
 
   if (!result.success) {
     return { success: false, message: `拉取失败: ${result.error}` };

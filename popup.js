@@ -647,43 +647,61 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // 删除链接处理函数（现在接收 link 对象而不是 index）
   async function handleDeleteLink(link) {
+    console.log('[delete] click handler start, link.id=', link && link.id);
     if (!link || !link.id) {
       showStatusMessage('删除失败：无效的链接', true);
       return;
     }
-    
-    // 确认删除
-    if (confirm(`确定要删除链接 "${link.title || '无标题'}" 吗？`)) {
-      try {
-        // 从 IndexedDB 删除
-        await deleteLinkFromStorage(link.id);
-        
-        showStatusMessage('链接已删除');
-        
-        // 只删除对应的 DOM 元素
-        const cardElement = linksContainer.querySelector(`[data-link-id="${link.id}"]`);
-        if (cardElement) {
-          cardElement.remove();
-        }
-        
-        // 从 loadedLinks 中移除该条数据
-        loadedLinks = loadedLinks.filter(l => l.id !== link.id);
-        renderedCount = Math.min(renderedCount, loadedLinks.length);
 
-        // 更新搜索数据源（全量）
-        if (updateSearchFn) {
-          updateSearchFn(loadedLinks);
-          refreshHistoryCache();
-        }
+    // 确认删除（popup 里的 confirm 可能行为不稳定，所以增加日志）
+    const ok = confirm(`确定要删除链接 "${link.title || '无标题'}" 吗？`);
+    console.log('[delete] confirm result:', ok);
+    if (!ok) return;
 
-        // 如果列表为空，显示空状态
-        if (loadedLinks.length === 0) {
-          showEmptyState(linksContainer);
-        }
-      } catch (error) {
-        logMessage('删除链接失败: ' + error.message);
-        showStatusMessage('删除失败', true);
+    // 先把对应的卡片锁定，避免 querySelector 拿不到
+    const cardElement = linksContainer.querySelector(
+      `.link-card[data-link-id="${link.id}"]`
+    );
+    console.log('[delete] found card via querySelector:', !!cardElement, 'via _cardElement:', !!link._cardElement);
+
+    try {
+      // 从 IndexedDB 删除
+      console.log('[delete] calling deleteLinkFromStorage...');
+      await deleteLinkFromStorage(link.id);
+      console.log('[delete] deleteLinkFromStorage resolved');
+
+      showStatusMessage('链接已删除');
+
+      // 优先用已锁定的引用移除 DOM，避免 data-link-id 类型/字符串不匹配
+      if (cardElement) {
+        cardElement.remove();
+        console.log('[delete] card removed via querySelector ref');
+      } else if (link._cardElement) {
+        link._cardElement.remove();
+        console.log('[delete] card removed via _cardElement ref');
+      } else {
+        console.warn('[delete] NO card reference found, DOM not updated');
       }
+
+      // 从 loadedLinks 中移除该条数据
+      loadedLinks = loadedLinks.filter(l => l.id !== link.id);
+      renderedCount = Math.min(renderedCount, loadedLinks.length);
+
+      // 更新搜索数据源（全量）
+      if (updateSearchFn) {
+        updateSearchFn(loadedLinks);
+        refreshHistoryCache();
+      }
+
+      // 如果列表为空，显示空状态
+      if (loadedLinks.length === 0) {
+        showEmptyState(linksContainer);
+      }
+      console.log('[delete] DONE, loadedLinks.length=', loadedLinks.length);
+    } catch (error) {
+      console.error('[delete] CAUGHT ERROR:', error);
+      logMessage('删除链接失败: ' + error.message);
+      showStatusMessage('删除失败', true);
     }
   }
   
@@ -1752,20 +1770,18 @@ document.addEventListener('DOMContentLoaded', function() {
       console.log('[popup] 🔵 点击了同步按钮');
       if (syncStatusText) syncStatusText.textContent = '正在同步...';
       try {
-        // 获取服务器地址和密钥
+        // 获取服务器地址
         const userSettings = await loadSettings();
         const peerUrl = userSettings.syncPeerUrl;
-        const secret = userSettings.syncSecret || '';
         console.log('[popup] 🔵 peerUrl:', peerUrl);
-        console.log('[popup] 🔵 secret:', secret ? '已配置' : '未配置');
 
         if (!peerUrl) {
           if (syncStatusText) syncStatusText.textContent = '请先配置服务器地址';
           return;
         }
 
-        // 调用同步（传入密钥）
-        const res = await simpleSync(peerUrl, secret);
+        // 调用同步
+        const res = await simpleSync(peerUrl);
         console.log('[popup] 🔵 同步结果:', res);
         if (res && res.success) {
           if (syncStatusText) syncStatusText.textContent = res.message || '同步成功';

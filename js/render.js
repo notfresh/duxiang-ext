@@ -19,6 +19,8 @@ export function createLinkCard(link, index, onDelete, onEdit, onPin, onLog = nul
   const card = document.createElement('div');
   card.className = 'link-card';
   card.dataset.linkId = link.id;
+  // 把卡片引用挂到 link 对象上，删除时可以直接拿引用移除，无需 querySelector
+  link._cardElement = card;
 
   // 头部区域：标题和删除按钮
   const cardHeader = document.createElement('div');

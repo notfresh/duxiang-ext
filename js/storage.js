@@ -6,8 +6,25 @@
 import { openDB, getStore, add, get, getAll, put, del, deleteDB } from './idb.js';
 import { parseTags, tagsArrayToString } from './utils.js';
 
+/**
+ * 计算同步用的 hash（与服务器保持一致：title::url）
+ * @param {string} url
+ * @param {string} title
+ * @returns {Promise<string>}
+ */
+async function computeHashForSync(url, title) {
+  const content = (title || '') + '::' + (url || '');
+  const encoder = new TextEncoder();
+  const data = encoder.encode(content);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 const DB_NAME = 'readingLinks';
-const DB_VERSION = 3; // 使用版本 3
+const DB_VERSION = 4; // 使用版本 4，新增 deleted_hashes 表
+
+const DELETED_STORE_NAME = 'deleted_hashes';
 
 const STORE_NAME = 'links';
 const GROUPS_STORE_NAME = 'groups'; // 新增分组对象存储
@@ -83,6 +100,14 @@ async function initDB() {
       if (!db.objectStoreNames.contains(SELECTIONS_STORE_NAME)) {
         console.log(`[initDB] 创建对象存储: ${SELECTIONS_STORE_NAME}`);
         db.createObjectStore(SELECTIONS_STORE_NAME, { keyPath: 'url' });
+      }
+
+      // 版本4：创建 deleted_hashes 对象存储
+      if (oldVersion < 4 && newVersion >= 4) {
+        if (!db.objectStoreNames.contains(DELETED_STORE_NAME)) {
+          console.log(`[initDB] 创建对象存储: ${DELETED_STORE_NAME}`);
+          db.createObjectStore(DELETED_STORE_NAME, { keyPath: 'hash' });
+        }
       }
       
       // 如果存在 tabGroups 对象存储，尝试删除（不强制，避免升级问题）
@@ -743,15 +768,151 @@ export async function addLink(link) {
  * @returns {Promise<void>}
  */
 export async function deleteLink(id) {
+  // 第一步：先单独读出链接信息（用于同步 deleted_hash）
+  let linkToRecord = null;
+  {
+    const db = await initDB();
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const store = tx.objectStore(STORE_NAME);
+    linkToRecord = await new Promise((resolve, reject) => {
+      const req = store.get(id);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    // 等事务 oncomplete，保证读真的落定
+    await new Promise((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+  }
+
+  // 第二步：删除主记录 + 写 deleted_hash，合并到一个事务
+  {
+    const db = await initDB();
+    const tx = db.transaction([STORE_NAME, DELETED_STORE_NAME], 'readwrite');
+    const linkStore = tx.objectStore(STORE_NAME);
+    const deletedStore = tx.objectStore(DELETED_STORE_NAME);
+
+    // 同步排好 delete 请求
+    const delReq = linkStore.delete(id);
+
+    // 如果有链接信息，hash 已在第一步算过，直接同步 put
+    let putReq = null;
+    if (linkToRecord) {
+      const hash = await computeHashForSync(linkToRecord.url, linkToRecord.title);
+      putReq = deletedStore.put({ hash, timestamp: Date.now() });
+    }
+
+    // 等所有请求都成功
+    await new Promise((resolve, reject) => {
+      let pending = putReq ? 2 : 1;
+      let errored = false;
+
+      const done = (err) => {
+        if (errored) return;
+        if (err) {
+          errored = true;
+          reject(err);
+          return;
+        }
+        pending--;
+        if (pending === 0) resolve();
+      };
+
+      delReq.onsuccess = () => done(null);
+      delReq.onerror = () => done(delReq.error);
+
+      if (putReq) {
+        putReq.onsuccess = () => done(null);
+        putReq.onerror = () => done(putReq.error);
+      }
+
+      // 事务兜底
+      tx.oncomplete = () => {
+        if (!errored && pending === 0) resolve();
+      };
+      tx.onerror = () => done(tx.error);
+      tx.onabort = () => done(tx.error || new Error('事务被中止'));
+    });
+  }
+
+  // 第三步：清理分组引用（独立）
+  await cleanGroupLinkRefs(id);
+}
+
+/**
+ * 添加删除的 hash 到记录
+ * @param {string} hash - 链接的 hash
+ * @returns {Promise<void>}
+ */
+export async function addDeletedHash(hash) {
+  try {
+    const db = await initDB();
+    const store = getStore(db, DELETED_STORE_NAME, 'readwrite');
+    await put(store, { hash, timestamp: Date.now() });
+    console.log('[storage] 记录删除 hash:', hash);
+  } catch (error) {
+    console.error('记录删除失败:', error);
+  }
+}
+
+/**
+ * 获取所有已删除的 hash
+ * @returns {Promise<Array<string>>}
+ */
+export async function getDeletedHashes() {
+  try {
+    const db = await initDB();
+    const store = getStore(db, DELETED_STORE_NAME, 'readonly');
+    const records = await getAll(store);
+    return records.map(r => r.hash);
+  } catch (error) {
+    console.error('获取删除记录失败:', error);
+    return [];
+  }
+}
+
+/**
+ * 批量删除已同步的 hash（从删除记录中移除）
+ * @param {Array<string>} hashes - 已同步的 hash 数组
+ * @returns {Promise<void>}
+ */
+export async function removeDeletedHashes(hashes) {
+  try {
+    const db = await initDB();
+    const store = getStore(db, DELETED_STORE_NAME, 'readwrite');
+    for (const hash of hashes) {
+      await del(store, hash);
+    }
+    console.log('[storage] 移除已同步的删除记录:', hashes.length, '条');
+  } catch (error) {
+    console.error('移除删除记录失败:', error);
+  }
+}
+
+/**
+ * 根据 hash 从本地删除链接
+ * @param {string} hash - 链接的 hash
+ * @returns {Promise<boolean} 是否成功删除
+ */
+export async function deleteLinkByHash(hash) {
   try {
     const db = await initDB();
     const store = getStore(db, STORE_NAME, 'readwrite');
-    await del(store, id);
-    // 清理分组中的该链接引用
-    await cleanGroupLinkRefs(id);
+    const allLinks = await getAll(store);
+    for (const link of allLinks) {
+      const linkHash = await computeHashForSync(link.url, link.title);
+      if (linkHash === hash) {
+        await del(store, link.id);
+        console.log('[storage] 根据 hash 删除链接:', link.title);
+        return true;
+      }
+    }
+    return false;
   } catch (error) {
-    console.error('删除链接失败:', error);
-    throw error;
+    console.error('根据 hash 删除链接失败:', error);
+    return false;
   }
 }
 
