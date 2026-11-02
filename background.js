@@ -3,9 +3,70 @@ console.log('[background] ========== Service Worker 已启动 ==========');
 console.log('[background] 时间:', new Date().toISOString());
 console.log('[background] 扩展 ID:', chrome.runtime.id);
 
+import { syncNow } from './js/sync-service.js';
+import { DB_NAME, DB_VERSION, SELECTIONS_STORE_NAME } from './js/db-constants.js';
+import { ensureAllStores } from './js/db-schema.js';
+
 // 弹窗尺寸常量
 const POPUP_WIDTH = 400;
 const POPUP_HEIGHT = 600;
+
+// ==================== 同步调度 ====================
+
+/**
+ * 自动推送的闹钟名。
+ *
+ * 为什么用 chrome.alarms 而不是 setTimeout：MV3 的 service worker 空闲 30 秒
+ * 就会被 Chrome 杀掉，setTimeout 排的定时任务会跟着一起消失。alarms 是
+ * Chrome 持久化的，service worker 被杀后重新唤醒时还能触发。
+ */
+const PUSH_ALARM = 'reading-share-sync-push';
+
+/** 闹钟的最小周期（分钟）。Chrome 对 < 1 分钟的周期会限流。 */
+const PUSH_ALARM_PERIOD_MINUTES = 1;
+
+/**
+ * 安排一次自动推送（防抖）。
+ *
+ * 触发源：storage.js 埋点落库后发消息给 service worker。
+ * 1 分钟的闹钟周期 = 最多延迟 1 分钟才推出去 —— 对「收藏完 1 分钟内手机
+ * 能看到」这个诉求足够。真要更快，可以把周期改成 0.2 分钟（Chrome 最低
+ * 30 秒），代价是 service worker 被唤醒得更频繁。
+ */
+function scheduleAutoPush() {
+  chrome.alarms.create(PUSH_ALARM, {
+    delayInMinutes: 0.02, // 首次 1.2 秒后
+    periodInMinutes: PUSH_ALARM_PERIOD_MINUTES,
+  });
+}
+
+// 监听埋点消息 → 排一次推送
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log('[background] 收到消息:', message);
+  if (message.type === 'ping') {
+    sendResponse({ status: 'pong', time: new Date().toISOString() });
+    return true; // 保持消息通道开放以支持异步响应
+  }
+
+  // 埋点通知：有新事件落库，排一次防抖推送
+  if (message.type === 'eventlog-dirty') {
+    scheduleAutoPush();
+    sendResponse({ status: 'scheduled' });
+    return true;
+  }
+});
+
+// 闹钟触发 → 执行一次同步
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (alarm.name !== PUSH_ALARM) return;
+  console.log('[background] 闹钟触发，开始同步');
+  try {
+    const res = await syncNow();
+    console.log('[background] 同步结果:', res);
+  } catch (error) {
+    console.error('[background] 同步异常:', error);
+  }
+});
 
 // 监听安装事件
 chrome.runtime.onInstalled.addListener((details) => {
@@ -20,14 +81,7 @@ chrome.runtime.onStartup.addListener(() => {
 });
 
 // 监听来自 popup 的消息（用于测试 Service Worker 是否运行）
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log('[background] 收到消息:', message);
-  if (message.type === 'ping') {
-    sendResponse({ status: 'pong', time: new Date().toISOString() });
-    return true; // 保持消息通道开放以支持异步响应
-  }
-
-  });
+// 注：onMessage 的监听器已在上方「同步调度」段统一注册，这里不再重复注册。
 
 chrome.commands.onCommand.addListener((command) => {
     console.log('[background] 收到命令:', command);
@@ -116,10 +170,6 @@ chrome.commands.onCommand.addListener((command) => {
 });
 
 // ==================== 保存选中文本功能 ====================
-
-const DB_NAME = 'readingLinks';
-const DB_VERSION = 3;
-const SELECTIONS_STORE_NAME = 'selections';
 
 /**
  * 处理保存选中文本
@@ -251,11 +301,8 @@ async function saveSelectionToDB(url, title, text, html = '', contextTag = '') {
         request.onupgradeneeded = (event) => {
             const db = event.target.result;
             console.log('[background] 数据库升级中，当前版本:', db.version);
-            // 创建 selections store（如果不存在）
-            if (!db.objectStoreNames.contains(SELECTIONS_STORE_NAME)) {
-                console.log('[background] 创建 selections 对象存储');
-                db.createObjectStore(SELECTIONS_STORE_NAME, { keyPath: 'url' });
-            }
+            // 建齐所有 store（schema 单一来源，js/db-schema.js）
+            ensureAllStores(db);
         };
 
         request.onsuccess = async (event) => {

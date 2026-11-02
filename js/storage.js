@@ -5,6 +5,16 @@
 
 import { openDB, getStore, add, get, getAll, put, del, deleteDB } from './idb.js';
 import { parseTags, tagsArrayToString } from './utils.js';
+import { recordLink } from './eventlog.js';
+import {
+  DB_NAME,
+  DB_VERSION,
+  STORE_NAME,
+  GROUPS_STORE_NAME,
+  SETTINGS_STORE_NAME,
+  SELECTIONS_STORE_NAME,
+} from './db-constants.js';
+import { ensureAllStores } from './db-schema.js';
 
 /**
  * 计算同步用的 hash（与服务器保持一致：title::url）
@@ -20,15 +30,6 @@ async function computeHashForSync(url, title) {
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
-
-const DB_NAME = 'readingLinks';
-const DB_VERSION = 4; // 使用版本 4，新增 deleted_hashes 表
-
-const DELETED_STORE_NAME = 'deleted_hashes';
-
-const STORE_NAME = 'links';
-const GROUPS_STORE_NAME = 'groups'; // 新增分组对象存储
-const SELECTIONS_STORE_NAME = 'selections'; // 存储页面选中文本
 
 let dbInstance = null;
 
@@ -74,42 +75,15 @@ async function initDB() {
     console.log(`[initDB] 打开数据库: ${DB_NAME}, 版本: ${DB_VERSION}`);
     dbInstance = await openDB(DB_NAME, DB_VERSION, (db, oldVersion, newVersion) => {
       console.log(`[initDB] 数据库升级: ${oldVersion} -> ${newVersion}`);
-      
-      // 创建链接对象存储（如果不存在）
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        console.log(`[initDB] 创建对象存储: ${STORE_NAME}`);
-        const store = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
-        store.createIndex('url', 'url', { unique: true });
-        store.createIndex('timestamp', 'timestamp');
-      }
-      // 创建分组对象存储（如果不存在）
-      if (!db.objectStoreNames.contains(GROUPS_STORE_NAME)) {
-        console.log(`[initDB] 创建对象存储: ${GROUPS_STORE_NAME}`);
-        db.createObjectStore(GROUPS_STORE_NAME, { keyPath: 'groupId' });
-      }
-      
-      // 版本2：创建设置对象存储
-      if (oldVersion < 2 && newVersion >= 2) {
-        if (!db.objectStoreNames.contains('settings')) {
-          console.log('[initDB] 创建对象存储: settings');
-          db.createObjectStore('settings', { keyPath: 'key' });
-        }
-      }
 
-      // 创建选中文本对象存储（如果不存在）
-      if (!db.objectStoreNames.contains(SELECTIONS_STORE_NAME)) {
-        console.log(`[initDB] 创建对象存储: ${SELECTIONS_STORE_NAME}`);
-        db.createObjectStore(SELECTIONS_STORE_NAME, { keyPath: 'url' });
-      }
+      // 建齐所有对象存储 —— schema 单一来源（js/db-schema.js）。
+      //
+      // 为什么不用 if (oldVersion < N) 分版本建表：IndexedDB 只跑「触发升级
+      // 的那个连接」的 onupgradeneeded，别的连接（eventlog.js / background.js）
+      // 的建表逻辑不会跑。ensureAllStores 是幂等的 —— 不管谁先打开、库
+      // 当前是第几版，都能把所有 store 建齐。
+      ensureAllStores(db);
 
-      // 版本4：创建 deleted_hashes 对象存储
-      if (oldVersion < 4 && newVersion >= 4) {
-        if (!db.objectStoreNames.contains(DELETED_STORE_NAME)) {
-          console.log(`[initDB] 创建对象存储: ${DELETED_STORE_NAME}`);
-          db.createObjectStore(DELETED_STORE_NAME, { keyPath: 'hash' });
-        }
-      }
-      
       // 如果存在 tabGroups 对象存储，尝试删除（不强制，避免升级问题）
       if (db.objectStoreNames.contains('tabGroups')) {
         try {
@@ -121,7 +95,7 @@ async function initDB() {
           // 不抛出错误，继续执行
         }
       }
-      
+
       console.log(`[initDB] 升级完成，当前对象存储: ${Array.from(db.objectStoreNames).join(', ')}`);
     });
     
@@ -709,6 +683,9 @@ export async function archiveLink(linkId) {
   link.archivedAt = new Date().toISOString();
   await put(store, link);
   console.log('[archiveLink] 归档成功');
+  // 同步埋点：**不发事件** —— archived 不是两端共有字段（不在 SYNCED_FIELDS
+  // 里），发出去也只是空 diff（old/data 的共有字段完全相同）。
+  // 折叠远端事件时 upsertLinkByUrl 保留 archived 字段，本地归档状态不被冲掉。
 }
 
 /**
@@ -751,6 +728,8 @@ export async function addLink(link) {
     console.log('[addLink] 准备添加数据:', linkData);
     const id = await add(store, linkData);
     console.log('[addLink] 添加成功，ID:', id);
+    // 同步埋点：新增一条链接 = 一个 create 事件（entity_id = url）
+    await emitLinkEvent({ ...linkData, id }, 'create', null);
     return id;
   } catch (error) {
     if (error.name === 'ConstraintError') {
@@ -787,107 +766,22 @@ export async function deleteLink(id) {
     });
   }
 
-  // 第二步：删除主记录 + 写 deleted_hash，合并到一个事务
+  // 第二步：删除主记录
+  // 旧实现在这里同时写 deleted_hashes 表（旧 simple-sync 机制的删除标记）。
+  // 新方案用 tombstone 事件表达删除（见第四步），不需要那张表。
   {
     const db = await initDB();
-    const tx = db.transaction([STORE_NAME, DELETED_STORE_NAME], 'readwrite');
-    const linkStore = tx.objectStore(STORE_NAME);
-    const deletedStore = tx.objectStore(DELETED_STORE_NAME);
-
-    // 同步排好 delete 请求
-    const delReq = linkStore.delete(id);
-
-    // 如果有链接信息，hash 已在第一步算过，直接同步 put
-    let putReq = null;
-    if (linkToRecord) {
-      const hash = await computeHashForSync(linkToRecord.url, linkToRecord.title);
-      putReq = deletedStore.put({ hash, timestamp: Date.now() });
-    }
-
-    // 等所有请求都成功
-    await new Promise((resolve, reject) => {
-      let pending = putReq ? 2 : 1;
-      let errored = false;
-
-      const done = (err) => {
-        if (errored) return;
-        if (err) {
-          errored = true;
-          reject(err);
-          return;
-        }
-        pending--;
-        if (pending === 0) resolve();
-      };
-
-      delReq.onsuccess = () => done(null);
-      delReq.onerror = () => done(delReq.error);
-
-      if (putReq) {
-        putReq.onsuccess = () => done(null);
-        putReq.onerror = () => done(putReq.error);
-      }
-
-      // 事务兜底
-      tx.oncomplete = () => {
-        if (!errored && pending === 0) resolve();
-      };
-      tx.onerror = () => done(tx.error);
-      tx.onabort = () => done(tx.error || new Error('事务被中止'));
-    });
+    const store = getStore(db, STORE_NAME, 'readwrite');
+    await del(store, id);
   }
 
   // 第三步：清理分组引用（独立）
   await cleanGroupLinkRefs(id);
-}
 
-/**
- * 添加删除的 hash 到记录
- * @param {string} hash - 链接的 hash
- * @returns {Promise<void>}
- */
-export async function addDeletedHash(hash) {
-  try {
-    const db = await initDB();
-    const store = getStore(db, DELETED_STORE_NAME, 'readwrite');
-    await put(store, { hash, timestamp: Date.now() });
-    console.log('[storage] 记录删除 hash:', hash);
-  } catch (error) {
-    console.error('记录删除失败:', error);
-  }
-}
-
-/**
- * 获取所有已删除的 hash
- * @returns {Promise<Array<string>>}
- */
-export async function getDeletedHashes() {
-  try {
-    const db = await initDB();
-    const store = getStore(db, DELETED_STORE_NAME, 'readonly');
-    const records = await getAll(store);
-    return records.map(r => r.hash);
-  } catch (error) {
-    console.error('获取删除记录失败:', error);
-    return [];
-  }
-}
-
-/**
- * 批量删除已同步的 hash（从删除记录中移除）
- * @param {Array<string>} hashes - 已同步的 hash 数组
- * @returns {Promise<void>}
- */
-export async function removeDeletedHashes(hashes) {
-  try {
-    const db = await initDB();
-    const store = getStore(db, DELETED_STORE_NAME, 'readwrite');
-    for (const hash of hashes) {
-      await del(store, hash);
-    }
-    console.log('[storage] 移除已同步的删除记录:', hashes.length, '条');
-  } catch (error) {
-    console.error('移除删除记录失败:', error);
+  // 第四步：同步埋点 —— 删除 = tombstone 事件（entity_id = url）
+  // linkToRecord 是删除前的快照，用来算 old
+  if (linkToRecord) {
+    await emitLinkEvent(linkToRecord, 'delete', linkToRecord);
   }
 }
 
@@ -940,6 +834,8 @@ export async function updateLink(id, updates) {
     }
     const updated = { ...existing, ...processedUpdates, id };
     await put(store, updated);
+    // 同步埋点：更新 = 一个 update 事件（entity_id = url，old = 变更前快照）
+    await emitLinkEvent(updated, 'update', existing);
   } catch (error) {
     if (error.name === 'ConstraintError') {
       throw new Error('该 URL 已存在');
@@ -1070,6 +966,9 @@ export async function batchAddLinks(links) {
           }
           const id = await add(store, linkData);
           imported++;
+          // 同步埋点：批量导入的每条 = 一个 create 事件。
+          // eventlog 的自动推送有 1.5s 防抖 —— 1000 条导入只推一批。
+          await emitLinkEvent({ ...linkData, id }, 'create', null);
           if (i < 3 || (i + 1) % 100 === 0) {
             console.log(`[batchAddLinks] 第 ${i + 1} 条添加成功，ID: ${id}`);
           }
@@ -1117,6 +1016,8 @@ export async function togglePinLink(id) {
     // 切换置顶状态
     const updated = { ...existing, pinned: !existing.pinned, id };
     await put(store, updated);
+    // 同步埋点：pinned 是两端共有字段（Android 端叫 is_pinned）
+    await emitLinkEvent(updated, 'update', existing);
   } catch (error) {
     console.error('切换置顶状态失败:', error);
     throw error;
@@ -1302,5 +1203,113 @@ export async function deleteSelectionByIndex(url, index) {
     console.error('[deleteSelectionByIndex] 删除选中文本失败:', error);
     throw error;
   }
+}
+
+// ==================== 事件日志埋点 + 远端折叠支持 ====================
+
+/**
+ * 远端折叠进行中标志。
+ *
+ * 折叠远端事件时会写 links 表 —— 如果写操作照常触发埋点，就会把刚拉回来
+ * 的事件再记一条新事件推回服务端，形成回声（echo）循环。这个标志让折叠
+ * 期间的写操作**不**产生事件。
+ *
+ * 为什么不用 async-local 之类的方案：Chrome 扩展的 service worker 和 popup
+ * 是不同上下文，但同一个页面内的写操作都在同一个 JS 事件循环里跑。折叠是
+ * 一个同步范围内的 await 序列，用一个模块级布尔量 + try/finally 包住就够了
+ * —— 折叠期间不会有并发的用户操作插入（JS 单线程）。
+ */
+let remoteApplyDepth = 0;
+
+/**
+ * 在「不产生同步事件」的作用域内执行一段逻辑。
+ *
+ * @param {function} fn
+ */
+export async function setRemoteApplyScope(fn) {
+  remoteApplyDepth++;
+  try {
+    return await fn();
+  } finally {
+    remoteApplyDepth--;
+  }
+}
+
+/** 当前是否处于远端折叠作用域。 */
+export function isRemoteApplyScope() {
+  return remoteApplyDepth > 0;
+}
+
+/**
+ * 记录一条 link 变更事件（同步埋点）。
+ *
+ * 远端折叠作用域内不记录 —— 避免回声循环。
+ *
+ * @param {object} link     变更后的 link（delete 时传变更前的）
+ * @param {'create'|'update'|'delete'} action
+ * @param {object|null} previous 变更前的 link
+ */
+async function emitLinkEvent(link, action, previous) {
+  if (remoteApplyDepth > 0) return; // 折叠中：不产生事件
+  try {
+    await recordLink(link, action, previous);
+  } catch (error) {
+    console.error('[storage] 记录同步事件失败:', error.message);
+  }
+}
+
+/**
+ * 取全部 link 原始记录（不做归档过滤、不排序）—— 折叠器去重时用。
+ *
+ * @returns {Promise<Array<Object>>}
+ */
+export async function loadAllLinksRaw() {
+  const db = await initDB();
+  const store = getStore(db, STORE_NAME, 'readonly');
+  return await getAll(store);
+}
+
+/**
+ * 按 url 写入/更新一条 link —— 折叠器用。
+ *
+ * url 已存在就更新那条，不存在就新增。**不产生同步事件**（调用方在远端
+ * 折叠作用域内调用）。
+ *
+ * @param {Object} link
+ * @returns {Promise<number>} link id
+ */
+export async function upsertLinkByUrl(link) {
+  const db = await initDB();
+  const store = getStore(db, STORE_NAME, 'readwrite');
+  const url = (link.url || '').trim();
+  if (!url) throw new Error('link.url 不能为空');
+
+  const existing = await getLinkByUrl(url);
+  const data = {
+    title: link.title || '',
+    url: url,
+    tags: tagsArrayToString(link.tags),
+    timestamp: link.timestamp || new Date().toISOString(),
+    pinned: !!link.pinned,
+  };
+
+  if (existing) {
+    const merged = { ...existing, ...data, id: existing.id };
+    await put(store, merged);
+    return existing.id;
+  }
+  const id = await add(store, data);
+  return id;
+}
+
+/**
+ * 删除一条 link（按 id）—— 折叠器去重时用。**不产生同步事件**。
+ *
+ * @param {number} id
+ */
+export async function removeLinkById(id) {
+  const db = await initDB();
+  const store = getStore(db, STORE_NAME, 'readwrite');
+  await del(store, id);
 }
 

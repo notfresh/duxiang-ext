@@ -6,7 +6,7 @@ import { importBookmarks } from './js/bookmarks.js';
 import { setupSearch } from './js/search.js';
 import { loadSettings, saveSettings, updateCompactModeSettings, generateUUIDv4 } from './js/settings.js';
 import { loadHistory, addSearchKeyword, togglePinKeyword, deleteKeyword, getMaxCount, setMaxCount } from './js/searchHistory.js';
-import { simpleSync } from './js/simple-sync.js';
+import { syncNow, pullOnly } from './js/sync-service.js';
 
 document.addEventListener('DOMContentLoaded', function() {
   // 获取DOM元素
@@ -1770,23 +1770,17 @@ document.addEventListener('DOMContentLoaded', function() {
       console.log('[popup] 🔵 点击了同步按钮');
       if (syncStatusText) syncStatusText.textContent = '正在同步...';
       try {
-        // 获取服务器地址
-        const userSettings = await loadSettings();
-        const peerUrl = userSettings.syncPeerUrl;
-        console.log('[popup] 🔵 peerUrl:', peerUrl);
-
-        if (!peerUrl) {
-          if (syncStatusText) syncStatusText.textContent = '请先配置服务器地址';
-          return;
-        }
-
-        // 调用同步
-        const res = await simpleSync(peerUrl);
+        // 走 eventlog 协议：bootstrap → push → pull
+        const res = await syncNow();
         console.log('[popup] 🔵 同步结果:', res);
-        if (res && res.success) {
-          if (syncStatusText) syncStatusText.textContent = res.message || '同步成功';
-        } else {
-          if (syncStatusText) syncStatusText.textContent = `同步失败: ${res?.message || '未知错误'}`;
+        if (syncStatusText) {
+          syncStatusText.textContent = res.success
+            ? res.message
+            : `同步失败: ${res.message}`;
+        }
+        // 同步完刷新列表，让新拉回来的链接显示出来
+        if (res.success && res.pulled > 0) {
+          await loadLinksFromStorage();
         }
       } catch (e) {
         console.error('[popup] ❌ 同步异常:', e);
@@ -1957,6 +1951,16 @@ document.addEventListener('DOMContentLoaded', function() {
     refreshHistoryCache();
     // 加载置顶分组横条
     loadAndRenderPinnedGroups();
+    // 弹窗打开时拉一次 —— 手机端新增的链接，用户下次开插件就能看到。
+    // 拉取失败不影响本地使用，静默忽略。
+    pullOnly()
+      .then(res => {
+        if (res.success && res.pulled > 0) {
+          console.log('[popup] 启动拉取到', res.pulled, '条，重新渲染');
+          loadLinksFromStorage();
+        }
+      })
+      .catch(err => console.warn('[popup] 启动拉取失败:', err.message));
   }).catch(error => {
     console.error('[popup] 初始加载失败:', error);
   });
