@@ -1280,11 +1280,20 @@ export async function loadAllLinksRaw() {
  */
 export async function upsertLinkByUrl(link) {
   const db = await initDB();
-  const store = getStore(db, STORE_NAME, 'readwrite');
   const url = (link.url || '').trim();
   if (!url) throw new Error('link.url 不能为空');
 
-  const existing = await getLinkByUrl(url);
+  // 查找和写入必须在**同一个事务**里：IndexedDB 事务在 await 期间没有
+  // 挂起的请求会自动提交，分成两次（getLinkByUrl 自己开事务 + 这里再开
+  // readwrite）时，put 落在已提交的事务上直接抛 TransactionInactiveError。
+  const store = getStore(db, STORE_NAME, 'readwrite');
+  const index = store.index('url');
+  const existing = await new Promise((resolve, reject) => {
+    const req = index.get(url);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error);
+  });
+
   const data = {
     title: link.title || '',
     url: url,
