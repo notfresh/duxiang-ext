@@ -21,6 +21,7 @@
 import {
   DB_NAME,
   DB_VERSION,
+  STORE_NAME,
   EVENT_STORE_NAME,
   SYNC_POINT_STORE_NAME,
   ENTITY_STATE_STORE_NAME,
@@ -590,9 +591,13 @@ export async function pull(applier) {
   let cursor = await getCursor(cursorKey);
   let total = 0;
 
-  for (let loop = 0; loop < 10000; loop++) {
+  // 照 Android 端 EventLogClient.pull：每批 1000 条，一批一个读写事务，
+  // 折叠在事务内完成 —— 6027 条事件从 3 万个小事务缩到个位数大事务。
+  const batchLimit = 1000;
+
+  for (let loop = 0; loop < 100; loop++) {
     const url = `${base}/events?since=${encodeURIComponent(cursor || '')}` +
-      `&topic=${encodeURIComponent(TOPIC_LINKS)}&limit=${MAX_LIMIT}`;
+      `&topic=${encodeURIComponent(TOPIC_LINKS)}&limit=${batchLimit}`;
 
     let rows;
     try {
@@ -611,25 +616,113 @@ export async function pull(applier) {
 
     if (!Array.isArray(rows) || rows.length === 0) break;
 
-    for (const e of rows) {
-      // 落进本地事件日志（按 id 去重）
-      try {
-        await withStore(EVENT_STORE_NAME, 'readwrite', (s) => reqPut(s, e));
-      } catch (err) {
-        console.warn('[eventlog] 远端事件落库失败:', err.message);
-      }
-      // 折叠进业务表
-      await applyRemoteEvent(e, applier);
-      total++;
-    }
+    const folded = await foldBatchInTx(rows);
+    total += folded;
 
     cursor = rows[rows.length - 1].process_time;
     await setCursor(cursorKey, cursor);
 
-    if (rows.length < MAX_LIMIT) break;
+    if (rows.length < batchLimit) break;
   }
 
   return total;
+}
+
+/**
+ * 一批事件在一个读写事务内：落 event_log + 折叠进 links + 写 entity_state。
+ *
+ * 照 Android LinkEventApplier 的折叠语义逐条 merge（字段级 LWW、URL 身份），
+ * 但把「每条 5 个 await、5 个事务」压成「整批 1 个事务」：
+ *   1. 事务内批量预读：entity_state（按事件去重）+ links（按 url 去重）
+ *   2. 内存里按 process_time 升序逐条 merge（与逐条 await 完全同结果）
+ *   3. 同事务写回全部变更
+ *
+ * @param {object[]} rows 服务端返回的一批事件（process_time 升序）
+ * @returns {Promise<number>} 折叠生效的事件数
+ */
+async function foldBatchInTx(rows) {
+  const db = await getDB();
+  const tx = db.transaction([EVENT_STORE_NAME, STORE_NAME, ENTITY_STATE_STORE_NAME], 'readwrite');
+  const eventStore = tx.objectStore(EVENT_STORE_NAME);
+  const linkStore = tx.objectStore(STORE_NAME);
+  const stateStore = tx.objectStore(ENTITY_STATE_STORE_NAME);
+  const urlIndex = linkStore.index('url');
+
+  // ---- 1. 批量预读（请求都在同一事务里发出，事务不会中途提交）----
+  const seenEntities = [...new Set(rows.map(e => `${TOPIC_LINKS}|${e.entity_id}`))];
+  const seenUrls = [...new Set(rows.filter(e => e.entity_id).map(e => e.entity_id))];
+
+  const statePromises = seenEntities.map(key => new Promise((res) => {
+    const r = stateStore.get(key);
+    r.onsuccess = () => res([key, r.result ? r.result.state : null]);
+    r.onerror = () => res([key, null]);
+  }));
+  const linkPromises = seenUrls.map(u => new Promise((res) => {
+    const r = urlIndex.get(u);
+    r.onsuccess = () => res([u, r.result || null]);
+    r.onerror = () => res([u, null]);
+  }));
+  const stateMap = new Map(await Promise.all(statePromises));
+  const linkMap = new Map(await Promise.all(linkPromises));
+
+  // ---- 2. 内存逐条 merge ----
+  let applied = 0;
+  for (const e of rows) {
+    // 事件落本地日志（按 id 幂等 —— put 覆盖同 id）
+    eventStore.put(e);
+
+    if (!e.entity_id) continue;
+    const stateKey = `${TOPIC_LINKS}|${e.entity_id}`;
+    const state = stateMap.get(stateKey);
+    if (!isNewerThan(state, e)) continue; // 同 entity 的旧事件不重复应用
+
+    if (e.action === 'delete') {
+      const local = linkMap.get(e.entity_id);
+      if (local) {
+        linkStore.delete(local.id);
+        linkMap.set(e.entity_id, null);
+      }
+      stateMap.set(stateKey, { process_time: e.process_time, data: null });
+      applied++;
+      continue;
+    }
+
+    const remote = e.data;
+    if (!remote || !remote.url) continue;
+
+    const changed = diffFields(e.old, remote);
+    const localWire = linkMap.get(e.entity_id) ? toWire(linkMap.get(e.entity_id)) : null;
+    const mergedWire = localWire
+      ? mergeByFields(localWire, remote, changed)
+      : remote;
+    const record = fromWire(mergedWire);
+
+    // put 返回 key，回填 id 供后续事件在同批内继续 merge
+    const putReq = linkStore.put(record);
+    putReq.onsuccess = () => { record.id = putReq.result; };
+    linkMap.set(e.entity_id, record);
+
+    stateMap.set(stateKey, { process_time: e.process_time, data: remote });
+    applied++;
+  }
+
+  // ---- 3. 写回 entity_state（links 已在上面 put/delete）----
+  for (const [key, st] of stateMap) {
+    if (!st) continue;
+    stateStore.put({
+      key,
+      state: st,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  await new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+
+  return applied;
 }
 
 // ============================ 维护 ============================
