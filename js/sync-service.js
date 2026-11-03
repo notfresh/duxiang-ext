@@ -93,17 +93,28 @@ export async function syncNow() {
     const tp = performance.now();
     const pushed = await pushPending(TOPIC_LINKS);
     console.log(`[sync][计时] push ${Math.round(performance.now() - tp)}ms (${pushed} 条)`);
-    if (pushed < 0) {
-      return { success: false, message: '推送失败（游标未推进，下次重试）' };
-    }
+
+    // push 失败不拦截 pull —— 两端方向独立（照 APK：push/pull 各自执行，
+    // 失败各自记日志）。否则推送网络一抖，拉取也跟着废，对端的新数据
+    // 永远看不到。
+    const pushFailed = pushed < 0;
 
     // 折叠在「不产生事件」的作用域内跑 —— 否则拉回来的事件会被再记一遍
     // 推回服务端，形成回声循环。
     const tl = performance.now();
     const pulled = await setRemoteApplyScope(() => pull(applyLinkEvent));
     console.log(`[sync][计时] pull ${Math.round(performance.now() - tl)}ms (${pulled} 条) | syncNow 总计 ${Math.round(performance.now() - t0)}ms`);
-    if (pulled < 0) {
-      return { success: false, message: `推送 ${pushed} 条成功，但拉取失败`, pushed, pulled: 0 };
+
+    if (pushFailed || pulled < 0) {
+      const parts = [];
+      parts.push(pushFailed ? '推送失败（游标未推进，下次重试）' : `上传 ${pushed} 条`);
+      parts.push(pulled < 0 ? '拉取失败' : `下载 ${pulled} 条`);
+      return {
+        success: !pushFailed && pulled >= 0,
+        message: parts.join('，'),
+        pushed: Math.max(pushed, 0),
+        pulled: Math.max(pulled, 0),
+      };
     }
 
     return {
