@@ -18,7 +18,7 @@
 
 import {
   getLinkByUrl,
-  loadAllLinksRaw,
+  getLinksByUrlAll,
   upsertLinkByUrl,
   removeLinkById,
   setRemoteApplyScope,
@@ -96,8 +96,7 @@ export async function applyLinkEvent(event) {
  * 删除本地所有 url 匹配的链接（tombstone 生效）。
  */
 async function removeLinkByUrl(url) {
-  const all = await loadAllLinksRaw();
-  const matches = all.filter(l => l.url === url);
+  const matches = await getLinksByUrlAll(url);
   for (const m of matches) {
     await removeLinkById(m.id);
   }
@@ -107,8 +106,7 @@ async function removeLinkByUrl(url) {
  * 同一个 url 有多行时：保留 timestamp 最新的那条，其余删掉。
  */
 async function dedupeByUrl(url) {
-  const all = await loadAllLinksRaw();
-  const matches = all.filter(l => l.url === url);
+  const matches = await getLinksByUrlAll(url);
   if (matches.length <= 1) return;
 
   const sorted = matches.slice().sort((a, b) => {

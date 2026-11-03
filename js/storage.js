@@ -850,6 +850,21 @@ export async function updateLink(id, updates) {
  * @param {string} url - URL
  * @returns {Promise<Object|null>} 链接对象或 null
  */
+/**
+ * 按 url 索引取**所有**匹配行（通常 0/1 条，异常路径可能多条）。
+ * 折叠器去重用 —— 走索引，不做全表扫描。
+ */
+export async function getLinksByUrlAll(url) {
+  const db = await initDB();
+  const store = getStore(db, STORE_NAME, 'readonly');
+  const index = store.index('url');
+  return new Promise((resolve, reject) => {
+    const req = index.getAll(url);
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error);
+  });
+}
+
 export async function getLinkByUrl(url) {
   console.log('[getLinkByUrl] 查找 URL:', url?.substring(0, 50));
   try {
