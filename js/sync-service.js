@@ -84,17 +84,24 @@ export async function syncNow() {
     return { success: false, message: '请先配置服务器地址、密钥和设备 ID' };
   }
 
+  const t0 = performance.now();
   try {
+    const tb = performance.now();
     await bootstrapIfNeeded();
+    console.log(`[sync][计时] bootstrap ${Math.round(performance.now() - tb)}ms`);
 
+    const tp = performance.now();
     const pushed = await pushPending(TOPIC_LINKS);
+    console.log(`[sync][计时] push ${Math.round(performance.now() - tp)}ms (${pushed} 条)`);
     if (pushed < 0) {
       return { success: false, message: '推送失败（游标未推进，下次重试）' };
     }
 
     // 折叠在「不产生事件」的作用域内跑 —— 否则拉回来的事件会被再记一遍
     // 推回服务端，形成回声循环。
+    const tl = performance.now();
     const pulled = await setRemoteApplyScope(() => pull(applyLinkEvent));
+    console.log(`[sync][计时] pull ${Math.round(performance.now() - tl)}ms (${pulled} 条) | syncNow 总计 ${Math.round(performance.now() - t0)}ms`);
     if (pulled < 0) {
       return { success: false, message: `推送 ${pushed} 条成功，但拉取失败`, pushed, pulled: 0 };
     }

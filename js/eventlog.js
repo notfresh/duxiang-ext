@@ -595,11 +595,16 @@ export async function pull(applier) {
   // 折叠在事务内完成 —— 6027 条事件从 3 万个小事务缩到个位数大事务。
   const batchLimit = 1000;
 
+  const t0 = performance.now();
+  let fetchMs = 0, foldMs = 0, cursorMs = 0;
+  console.log(`[eventlog][计时] ▶ pull 开始 cursor=${cursor ? cursor.slice(0, 19) : '(空)'}`);
+
   for (let loop = 0; loop < 100; loop++) {
     const url = `${base}/events?since=${encodeURIComponent(cursor || '')}` +
       `&topic=${encodeURIComponent(TOPIC_LINKS)}&limit=${batchLimit}`;
 
     let rows;
+    let tf = performance.now();
     try {
       const res = await fetch(url, {
         headers: { 'Authorization': cfg.secret },
@@ -613,18 +618,29 @@ export async function pull(applier) {
       console.warn('[eventlog] 拉取异常:', error.message);
       return total > 0 ? total : -1;
     }
+    fetchMs += performance.now() - tf;
 
-    if (!Array.isArray(rows) || rows.length === 0) break;
+    if (!Array.isArray(rows) || rows.length === 0) {
+      console.log(`[eventlog][计时] 批次#${loop} 服务端无新事件，结束`);
+      break;
+    }
 
+    const td = performance.now();
     const folded = await foldBatchInTx(rows);
+    foldMs += performance.now() - td;
+    console.log(`[eventlog][计时] 批次#${loop}: 收到 ${rows.length} 条, 折叠生效 ${folded} 条, 折叠耗时 ${foldBatchInTx.lastInner || '?'} (网络 ${Math.round(performance.now() - td - (foldBatchInTx.lastInnerMs || 0))}ms)`);
     total += folded;
 
+    const tc = performance.now();
     cursor = rows[rows.length - 1].process_time;
     await setCursor(cursorKey, cursor);
+    cursorMs += performance.now() - tc;
 
     if (rows.length < batchLimit) break;
   }
 
+  const totalMs = Math.round(performance.now() - t0);
+  console.log(`[eventlog][计时] ■ pull 结束: 共 ${total} 条 | 总 ${totalMs}ms = 网络 ${Math.round(fetchMs)}ms + 折叠 ${Math.round(foldMs)}ms + 游标 ${Math.round(cursorMs)}ms`);
   return total;
 }
 
@@ -641,7 +657,9 @@ export async function pull(applier) {
  * @returns {Promise<number>} 折叠生效的事件数
  */
 async function foldBatchInTx(rows) {
+  const tAll = performance.now();
   const db = await getDB();
+  const tOpen = performance.now();
   const tx = db.transaction([EVENT_STORE_NAME, STORE_NAME, ENTITY_STATE_STORE_NAME], 'readwrite');
   const eventStore = tx.objectStore(EVENT_STORE_NAME);
   const linkStore = tx.objectStore(STORE_NAME);
@@ -662,8 +680,10 @@ async function foldBatchInTx(rows) {
     r.onsuccess = () => res([u, r.result || null]);
     r.onerror = () => res([u, null]);
   }));
+  const tRead = performance.now();
   const stateMap = new Map(await Promise.all(statePromises));
   const linkMap = new Map(await Promise.all(linkPromises));
+  const tMerged = performance.now();
 
   // ---- 2. 内存逐条 merge ----
   let applied = 0;
@@ -716,11 +736,19 @@ async function foldBatchInTx(rows) {
     });
   }
 
+  const tWriteReq = performance.now();
   await new Promise((resolve, reject) => {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
     tx.onabort = () => reject(tx.error);
   });
+  const tDone = performance.now();
+
+  // 分段: getDB / 事务创建 / 预读等待 / merge循环 / 写请求发起 / 事务提交
+  const seg = `开库 ${Math.round(tOpen - tAll)}ms · 预读 ${Math.round(tMerged - tRead)}ms(${seenUrls.length}个url/${seenEntities.length}个实体) · merge ${Math.round(tWriteReq - tMerged)}ms · 提交 ${Math.round(tDone - tWriteReq)}ms`;
+  console.log(`[eventlog][计时]   └ 折叠内幕: ${seg} | 整批 ${Math.round(tDone - tAll)}ms`);
+  foldBatchInTx.lastInner = seg;
+  foldBatchInTx.lastInnerMs = tDone - tAll;
 
   return applied;
 }
